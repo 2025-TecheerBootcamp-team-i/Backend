@@ -86,7 +86,7 @@ class MusicTags(models.Model):
 class Users(models.Model):
     user_id = models.BigAutoField(primary_key=True)
     email = models.CharField(max_length=100)
-    password = models.IntegerField(blank=True, null=True)
+    password = models.CharField(max_length=150)
     nickname = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
