@@ -18,6 +18,8 @@ services:
   # PostgreSQL 데이터베이스 서비스
   db:
     image: postgres:18 # PostgreSQL 18 이미지 사용
+    ports:
+      - "5433:5432"  # 외부포트:5433, 내부포트:5432 (로컬 PostgreSQL과 충돌 방지)
     volumes:
       - postgres_data:/var/lib/postgresql # PostgreSQL 18+는 /var/lib/postgresql에 마운트
     environment:
