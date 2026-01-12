@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     'rest_framework', # Django REST Framework
     'django_celery_results', # Celery 작업 결과를 DB에 저장하기 위해 추가
     # Local apps
-    # 'music', # 우리가 만든 'music' 앱 추가 (TODO: music 앱 생성 필요)
+    'music', # 우리가 만든 'music' 앱 추가
 ]
 
 MIDDLEWARE = [
