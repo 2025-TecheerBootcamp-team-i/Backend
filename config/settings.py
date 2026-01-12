@@ -21,6 +21,10 @@ DEBUG = os.getenv('DEBUG', '1') == '1'
 # .env의 DJANGO_ALLOWED_HOSTS를 파싱, 각 호스트의 공백을 제거하여 안정성을 높임
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')]
 
+# 개발 환경에서는 모든 호스트 허용
+if DEBUG:
+    ALLOWED_HOSTS = ['*']
+
 
 # 애플리케이션 정의
 
@@ -33,6 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third-party apps
     'rest_framework', # Django REST Framework
+    'rest_framework_simplejwt', # JWT 인증 (Access/Refresh 토큰)
+    'corsheaders', # CORS 설정 (프론트엔드와 통신)
     'django_celery_results', # Celery 작업 결과를 DB에 저장하기 위해 추가
     # Local apps
     'music', # 우리가 만든 'music' 앱 추가
@@ -40,6 +46,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CORS 미들웨어 (최상단 근처에 위치)
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -140,3 +147,49 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Seoul'
 CELERY_ENABLE_UTC = False
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.AllowAny',  # 기본은 모두 허용
+    ),
+}
+
+from datetime import timedelta
+
+SIMPLE_JWT = { # 토큰 상세 설정
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),  # 시연용으로 길게 설정
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),   # 
+    'ROTATE_REFRESH_TOKENS': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+# CORS 설정 (프론트엔드와 통신)
+if DEBUG:
+    # 개발 환경: 모든 Origin 허용
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    # 프로덕션 환경: 특정 도메인만 허용
+    CORS_ALLOWED_ORIGINS = [
+        'https://your-frontend-domain.vercel.app',  # Vercel 배포 도메인으로 변경 필요
+        'http://localhost:3000',  # 로컬 개발용
+        'http://localhost:5173',  # Vite 개발 서버
+    ]
+
+# CORS 추가 설정
+CORS_ALLOW_CREDENTIALS = True  # 쿠키 전송 허용
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]

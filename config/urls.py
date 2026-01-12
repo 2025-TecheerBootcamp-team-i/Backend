@@ -8,6 +8,7 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/v1/', include('music.urls')),
     # /api/v1/ 경로로 시작하는 모든 요청을 music 앱의 urls.py로 전달합니다.
     path('api/v1/', include('music.urls')),
 ]
