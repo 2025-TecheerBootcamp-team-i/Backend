@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Django 웹 애플리케이션 서비스
   web:
@@ -12,18 +10,25 @@ services:
     env_file:
       - ./.env # .env 파일에서 환경 변수 로드
     depends_on:
-      - db # db 서비스가 먼저 시작되도록 의존성 설정
-      - rabbitmq # 메시지 브로커가 먼저 시작되도록 의존성 설정
+      db:
+        condition: service_healthy # DB가 healthy 상태일 때만 시작
+      rabbitmq:
+        condition: service_started # RabbitMQ가 시작되면 시작
 
   # PostgreSQL 데이터베이스 서비스
   db:
     image: postgres:18 # PostgreSQL 18 이미지 사용
     volumes:
-      - postgres_data:/var/lib/postgresql/ # 데이터 영속성을 위한 볼륨 마운트 (PostgreSQL 18+ 권장)
+      - postgres_data:/var/lib/postgresql # PostgreSQL 18+는 /var/lib/postgresql에 마운트
     environment:
       - POSTGRES_USER=music_user # DB 사용자 이름
       - POSTGRES_PASSWORD=music_password # DB 사용자 비밀번호
       - POSTGRES_DB=music_db # DB 이름
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U music_user -d music_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # RabbitMQ 메시지 브로커 서비스 (Celery용)
   rabbitmq:
@@ -41,8 +46,10 @@ services:
     env_file:
       - ./.env # .env 파일에서 환경 변수 로드
     depends_on:
-      - db # db 서비스가 먼저 시작되도록 의존성 설정
-      - rabbitmq # rabbitmq 서비스가 먼저 시작되도록 의존성 설정
+      db:
+        condition: service_healthy # DB가 healthy 상태일 때만 시작
+      rabbitmq:
+        condition: service_started # RabbitMQ가 시작되면 시작
 
 volumes:
   postgres_data: # PostgreSQL 데이터 저장을 위한 명명된 볼륨
