@@ -1,14 +1,9 @@
 """
 Music 앱의 View 모듈
-음악 관련 API 엔드포인트를 처리합니다.
+음악, 인증 관련 API 엔드포인트 처리
 """
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-=======
-인증 관련 View
-회원가입, 로그인, JWT 토큰 발급 처리
-"""
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
