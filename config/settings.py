@@ -148,48 +148,93 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Seoul'
 CELERY_ENABLE_UTC = False
 
+# ==============================================
+# Django REST Framework 설정
+# ==============================================
+# REST API의 기본 인증 및 권한 설정을 정의합니다.
 REST_FRAMEWORK = {
+    # 기본 인증 방식: JWT(JSON Web Token)를 사용합니다.
+    # 클라이언트는 로그인 후 발급받은 토큰을 Authorization 헤더에 포함하여 요청합니다.
+    # 예: Authorization: Bearer <access_token>
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    
+    # 기본 권한 정책: 모든 사용자에게 접근 허용 (인증 불필요)
+    # 개별 View에서 permission_classes를 지정하여 인증을 요구할 수 있습니다.
+    # 예: permission_classes = [IsAuthenticated]
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.AllowAny',  # 기본은 모두 허용
+        'rest_framework.permissions.AllowAny',
     ),
 }
 
 from datetime import timedelta
 
-SIMPLE_JWT = { # 토큰 상세 설정
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),  # 시연용으로 길게 설정
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),   # 
+# ==============================================
+# JWT(JSON Web Token) 상세 설정
+# ==============================================
+# 사용자 인증에 사용되는 JWT 토큰의 동작 방식을 정의합니다.
+SIMPLE_JWT = {
+    # Access Token 유효 기간: 24시간 (시연/개발용으로 길게 설정)
+    # 프로덕션 환경에서는 15분~1시간 권장
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    
+    # Refresh Token 유효 기간: 30일
+    # Access Token이 만료되면 Refresh Token으로 새로운 Access Token을 발급받습니다.
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    
+    # Refresh Token 갱신 시 새로운 Refresh Token도 함께 발급
+    # 보안 강화: 이전 Refresh Token은 무효화됩니다.
     'ROTATE_REFRESH_TOKENS': True,
+    
+    # 토큰 암호화 알고리즘: HMAC SHA-256
     'ALGORITHM': 'HS256',
+    
+    # 토큰 서명에 사용할 비밀 키 (Django SECRET_KEY 사용)
     'SIGNING_KEY': SECRET_KEY,
+    
+    # Authorization 헤더의 타입: "Bearer <token>" 형식 사용
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# CORS 설정 (프론트엔드와 통신)
+# ==============================================
+# CORS (Cross-Origin Resource Sharing) 설정
+# ==============================================
+# 프론트엔드(React)와 백엔드(Django)가 다른 도메인에서 실행될 때
+# 브라우저의 보안 정책(Same-Origin Policy)을 우회하여 통신을 허용합니다.
+#
+# 예시:
+# - 프론트엔드: http://localhost:3000 (React 개발 서버)
+# - 백엔드: http://localhost:8000 (Django API 서버)
+# → CORS 설정 없이는 브라우저가 요청을 차단합니다.
+
 if DEBUG:
-    # 개발 환경: 모든 Origin 허용
+    # 개발 환경: 모든 Origin(도메인)에서의 요청을 허용
+    # 주의: 프로덕션에서는 절대 사용하지 마세요! (보안 위험)
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    # 프로덕션 환경: 특정 도메인만 허용
+    # 프로덕션 환경: 허용할 도메인을 명시적으로 지정 (화이트리스트 방식)
     CORS_ALLOWED_ORIGINS = [
-        'https://your-frontend-domain.vercel.app',  # Vercel 배포 도메인으로 변경 필요
-        'http://localhost:3000',  # 로컬 개발용
-        'http://localhost:5173',  # Vite 개발 서버
+        'https://your-frontend-domain.vercel.app',  # Vercel 배포 도메인 (실제 도메인으로 변경 필요)
+        'http://localhost:3000',  # React 개발 서버 (로컬 테스트용)
+        'http://localhost:5173',  # Vite 개발 서버 (로컬 테스트용)
     ]
 
-# CORS 추가 설정
-CORS_ALLOW_CREDENTIALS = True  # 쿠키 전송 허용
+# CORS 쿠키 및 인증 정보 전송 허용
+# True로 설정 시 프론트엔드에서 쿠키, Authorization 헤더 등을 포함한 요청 가능
+# JWT 토큰을 사용하므로 Authorization 헤더 전송이 필요합니다.
+CORS_ALLOW_CREDENTIALS = True
+
+# CORS 요청 시 허용할 HTTP 헤더 목록
+# 프론트엔드에서 전송하는 모든 커스텀 헤더를 여기에 명시해야 합니다.
 CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
+    'accept',              # 응답 형식 지정 (예: application/json)
+    'accept-encoding',     # 압축 방식 (예: gzip, deflate)
+    'authorization',       # JWT 토큰 전송 (예: Bearer <token>)
+    'content-type',        # 요청 본문 형식 (예: application/json)
+    'dnt',                 # Do Not Track
+    'origin',              # 요청 출처
+    'user-agent',          # 클라이언트 정보
+    'x-csrftoken',         # CSRF 보호 토큰
+    'x-requested-with',    # AJAX 요청 식별
 ]
