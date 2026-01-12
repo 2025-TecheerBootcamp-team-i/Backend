@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Django 웹 애플리케이션 서비스
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000 # 개발 서버 실행 명령어
+    volumes:
+      - ./:/usr/src/app/ # 현재 디렉토리를 컨테이너의 /usr/src/app에 마운트
+    ports:
+      - 8000:8000 # 호스트의 8000번 포트를 컨테이너의 8000번 포트에 연결
+    env_file:
+      - ./.env # .env 파일에서 환경 변수 로드
+    depends_on:
+      - db # db 서비스가 먼저 시작되도록 의존성 설정
+      - rabbitmq # 메시지 브로커가 먼저 시작되도록 의존성 설정
+
+  # PostgreSQL 데이터베이스 서비스
+  db:
+    image: postgres:18 # PostgreSQL 18 이미지 사용
+    volumes:
+      - postgres_data:/var/lib/postgresql/ # 데이터 영속성을 위한 볼륨 마운트 (PostgreSQL 18+ 권장)
+    environment:
+      - POSTGRES_USER=music_user # DB 사용자 이름
+      - POSTGRES_PASSWORD=music_password # DB 사용자 비밀번호
+      - POSTGRES_DB=music_db # DB 이름
+
+  # RabbitMQ 메시지 브로커 서비스 (Celery용)
+  rabbitmq:
+    image: rabbitmq:3-management # 관리 UI가 포함된 RabbitMQ 이미지 사용
+    ports:
+      - 5672:5672 # AMQP 포트
+      - 15672:15672 # 관리 UI 포트 (http://localhost:15672)
+
+  # Celery 워커 서비스 (비동기 작업 처리)
+  celery:
+    build: .
+    command: celery -A celery_app worker -l info # Celery 워커 실행 명령어
+    volumes:
+      - ./:/usr/src/app/ # 현재 디렉토리를 컨테이너의 /usr/src/app에 마운트
+    env_file:
+      - ./.env # .env 파일에서 환경 변수 로드
+    depends_on:
+      - db # db 서비스가 먼저 시작되도록 의존성 설정
+      - rabbitmq # rabbitmq 서비스가 먼저 시작되도록 의존성 설정
+
+volumes:
+  postgres_data: # PostgreSQL 데이터 저장을 위한 명명된 볼륨
