@@ -2,7 +2,7 @@ import os
 from celery import Celery
 
 # Django의 settings 모듈을 Celery에 기본값으로 설정합니다.
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
 app = Celery('backend')
 
