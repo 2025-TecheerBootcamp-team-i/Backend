@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sandra-suno-mcp": {
+      "args": [
+        "-m",
+        "suno_mcp.server"
+      ],
+      "command": "python"
+    }
+  }
+}

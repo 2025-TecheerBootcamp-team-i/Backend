@@ -5,3 +5,6 @@ celery                   # 비동기 작업 큐
 python-dotenv            # .env 파일에서 환경 변수를 로드하기 위한 패키지
 django-celery-results    # Celery 작업 결과를 Django DB에 저장하기 위해 추가
 gunicorn                 # 프로덕션 환경용 WSGI HTTP 서버
+langchain-community      # LangChain Ollama 통합
+langchain-core           # LangChain 핵심 기능
+requests                 # HTTP 요청 라이브러리

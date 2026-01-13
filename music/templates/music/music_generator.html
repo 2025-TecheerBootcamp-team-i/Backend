@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 AI 음악 생성기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+        }
+        
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            background: #f8f9fa;
+            display: none;
+        }
+        
+        .result.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .result h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .result-item {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .result-label {
+            font-weight: 600;
+            color: #666;
+            margin-right: 8px;
+        }
+        
+        .btn-monitor {
+            margin-top: 15px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .btn-monitor:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(245, 87, 108, 0.3);
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .error.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 AI 음악 생성기</h1>
+        <p class="subtitle">한국어 가사와 보컬로 나만의 음악을 만들어보세요</p>
+        
+        <form id="musicForm">
+            <div class="form-group">
+                <label for="prompt">
+                    🎤 음악 프롬프트 *
+                    <span style="color: #999; font-weight: normal; font-size: 0.9em;">(예: 여름의 장미, 비 오는 날의 감성)</span>
+                </label>
+                <textarea id="prompt" name="prompt" required placeholder="원하는 음악의 분위기, 주제, 장르 등을 자유롭게 입력하세요..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="user_id">
+                    👤 사용자 ID (선택)
+                    <span style="color: #999; font-weight: normal; font-size: 0.9em;">(입력 시 아티스트명으로 사용됩니다)</span>
+                </label>
+                <input type="number" id="user_id" name="user_id" placeholder="예: 1">
+            </div>
+            
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="instrumental" name="instrumental">
+                    <label for="instrumental" style="margin-bottom: 0;">🎹 반주만 생성 (가사 없음)</label>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+                ✨ 음악 생성 시작
+            </button>
+        </form>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>AI가 음악을 생성하고 있습니다...</p>
+        </div>
+        
+        <div class="error" id="error"></div>
+        
+        <div class="result" id="result">
+            <h3>🎉 음악 생성 요청 완료!</h3>
+            <div class="result-item">
+                <span class="result-label">상태:</span>
+                <span id="status">⏳ 생성 중...</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Task ID:</span>
+                <span id="taskId">-</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Music ID:</span>
+                <span id="musicId">-</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">제목:</span>
+                <span id="musicName">-</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">아티스트:</span>
+                <span id="artistName">-</span>
+            </div>
+            
+            <button class="btn btn-monitor" id="monitorBtn">
+                📊 실시간 모니터링 보기
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        const form = document.getElementById('musicForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const error = document.getElementById('error');
+        const monitorBtn = document.getElementById('monitorBtn');
+        
+        let currentMusicId = null;
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // UI 초기화
+            loading.classList.add('show');
+            result.classList.remove('show');
+            error.classList.remove('show');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ 생성 중...';
+            
+            // 폼 데이터 수집
+            const formData = {
+                prompt: document.getElementById('prompt').value.trim(),
+                make_instrumental: document.getElementById('instrumental').checked
+            };
+            
+            const userId = document.getElementById('user_id').value.trim();
+            if (userId) {
+                formData.user_id = parseInt(userId);
+            }
+            
+            try {
+                // API 요청
+                const response = await fetch('/api/music/generate/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || '음악 생성에 실패했습니다.');
+                }
+                
+                // 결과 표시
+                currentMusicId = data.music_id;
+                document.getElementById('status').textContent = data.status || '완료';
+                document.getElementById('taskId').textContent = data.task_id || '-';
+                document.getElementById('musicId').textContent = data.music_id;
+                document.getElementById('musicName').textContent = data.music_name;
+                document.getElementById('artistName').textContent = data.artist_name || (data.artist?.artist_name) || 'AI Artist';
+                
+                result.classList.add('show');
+                
+            } catch (err) {
+                error.textContent = '❌ ' + err.message;
+                error.classList.add('show');
+            } finally {
+                loading.classList.remove('show');
+                submitBtn.disabled = false;
+                submitBtn.textContent = '✨ 음악 생성 시작';
+            }
+        });
+        
+        // 모니터링 버튼 클릭
+        monitorBtn.addEventListener('click', () => {
+            if (currentMusicId) {
+                // 새 창으로 모니터링 페이지 열기
+                const width = 800;
+                const height = 600;
+                const left = (screen.width - width) / 2;
+                const top = (screen.height - height) / 2;
+                
+                window.open(
+                    `/music/monitor/${currentMusicId}/`,
+                    'MusicMonitor',
+                    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+                );
+            }
+        });
+    </script>
+</body>
+</html>

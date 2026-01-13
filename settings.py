@@ -19,7 +19,24 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-default-secret-key-for-dev
 DEBUG = os.getenv('DEBUG', '1') == '1'
 
 # .env의 DJANGO_ALLOWED_HOSTS를 파싱, 각 호스트의 공백을 제거하여 안정성을 높임
-ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')]
+allowed_hosts_str = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost')
+ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_str.split(',')]
+
+# ngrok 도메인 자동 추가 (ngrok을 통한 외부 접근 허용)
+# Django는 도메인 앞에 점(.)을 붙이면 와일드카드처럼 작동합니다
+# 예: '.ngrok-free.dev' → '*.ngrok-free.dev'와 동일
+# ngrok URL은 매번 바뀔 수 있으므로 와일드카드 패턴 사용
+if os.getenv('SUNO_CALLBACK_URL', '').find('ngrok') != -1 or any('ngrok' in host.lower() for host in ALLOWED_HOSTS):
+    # ngrok 도메인 와일드카드 패턴 추가 (점으로 시작 = 모든 서브도메인 허용)
+    ngrok_patterns = [
+        '.ngrok-free.dev',  # *.ngrok-free.dev (무료 도메인)
+        '.ngrok.io',        # *.ngrok.io (유료 도메인)
+        '.ngrok.app',       # *.ngrok.app (앱 도메인)
+    ]
+    # 중복 제거하며 추가
+    for pattern in ngrok_patterns:
+        if pattern not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(pattern)
 
 
 # 애플리케이션 정의
@@ -75,11 +92,11 @@ WSGI_APPLICATION = 'wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': os.getenv('SQL_ENGINE', 'django.db.backends.postgresql'),
-        'NAME': os.getenv('SQL_DATABASE', 'music_db'),
-        'USER': os.getenv('SQL_USER', 'music_user'),
-        'PASSWORD': os.getenv('SQL_PASSWORD', 'music_password'),
-        'HOST': os.getenv('SQL_HOST', 'db'), # docker-compose 서비스 이름
-        'PORT': os.getenv('SQL_PORT', '5432'), # PostgreSQL 기본 포트
+        'NAME': os.getenv('SQL_DATABASE', 'postgres'),  # 로컬 PostgreSQL 데이터베이스
+        'USER': os.getenv('SQL_USER', 'postgres'),  # 로컬 PostgreSQL 사용자
+        'PASSWORD': os.getenv('SQL_PASSWORD', 'ok4989'),  # 로컬 PostgreSQL 비밀번호
+        'HOST': os.getenv('SQL_HOST', 'host.docker.internal'),  # Docker에서 호스트 접속 (macOS/Windows)
+        'PORT': os.getenv('SQL_PORT', '5432'),  # 로컬 PostgreSQL 포트
     }
 }
 
@@ -131,6 +148,13 @@ MEDIA_ROOT = BASE_DIR / 'media_root' # 사용자가 업로드한 파일이 저�
 # 자세한 내용은 https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field 참조
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Django REST Framework 설정
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [],  # 인증 비활성화 (개발용)
+    'DEFAULT_PERMISSION_CLASSES': [],  # 권한 비활성화 (개발용)
+    'UNAUTHENTICATED_USER': None,  # 인증되지 않은 사용자 허용
+}
 
 # Celery 설정
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'amqp://guest:guest@localhost:5672//')
