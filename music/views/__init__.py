@@ -21,7 +21,21 @@ from .search import MusicSearchView
 # 음악 상세 관련 Views
 from .music import MusicDetailView
 
-# 외부에서 사용 가능한 모든 클래스
+# 레거시 함수 기반 Views (웹 페이지 및 음악 생성)
+from .legacy import (
+    music_generator_page,
+    music_list_page,
+    music_monitor_page,
+    generate_music,
+    generate_music_async,
+    suno_webhook,
+    get_task_status,
+    get_suno_task_status,
+    list_music,
+    get_music_detail,
+)
+
+# 외부에서 사용 가능한 모든 클래스 및 함수
 __all__ = [
     # common
     'MusicPagination',
@@ -34,4 +48,15 @@ __all__ = [
     'MusicSearchView',
     # music
     'MusicDetailView',
+    # legacy (함수 기반)
+    'music_generator_page',
+    'music_list_page',
+    'music_monitor_page',
+    'generate_music',
+    'generate_music_async',
+    'suno_webhook',
+    'get_task_status',
+    'get_suno_task_status',
+    'list_music',
+    'get_music_detail',
 ]
