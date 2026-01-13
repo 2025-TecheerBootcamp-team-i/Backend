@@ -53,5 +53,20 @@ services:
       rabbitmq:
         condition: service_started # RabbitMQ가 시작되면 시작
 
+  # Ngrok 터널 서비스 (웹훅 콜백용, 선택적)
+  ngrok:
+    image: ngrok/ngrok:latest
+    command:
+      - http
+      - web:8000
+      - --log=stdout
+    ports:
+      - "4040:4040"  # ngrok 웹 UI 포트
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+    depends_on:
+      - web
+    restart: unless-stopped
+
 volumes:
   postgres_data: # PostgreSQL 데이터 저장을 위한 명명된 볼륨

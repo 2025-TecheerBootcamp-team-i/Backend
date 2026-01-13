@@ -39,14 +39,35 @@
     cd demo-repository
     ```
 
-2.  **환경 변수 파일 확인**
-    - 프로젝트 루트에 있는 `.env` 파일을 확인합니다. 로컬 개발에 필요한 모든 기본 설정이 이미 완료되어 있습니다.
+2.  **환경 변수 파일 생성**
+    ```bash
+    cp .env.example .env
+    ```
+    
+    `.env` 파일을 열어서 필요한 값들을 설정하세요:
+    - `SECRET_KEY`: Django 시크릿 키 (프로덕션에서는 반드시 변경!)
+    - `NGROK_AUTHTOKEN`: ngrok 인증 토큰 (웹훅 콜백 사용 시 필요)
+    - `SUNO_API_KEY`: Suno API 키 (음악 생성 기능 사용 시 필요)
+    - `WINDOWS_LLAMA_IP`: Llama 서버 IP (음악 생성 기능 사용 시 필요)
 
 3.  **Docker 컨테이너 실행**
-    ```bash
-    docker-compose up -d --build
-    ```
-    - 이 명령어로 웹 서버, 데이터베이스, 메시지 브로커, Celery 워커가 모두 백그라운드에서 실행됩니다.
+   
+   **기본 실행 (ngrok 없이):**
+   ```bash
+   docker-compose up -d --build
+   ```
+   
+   **ngrok 포함 실행 (웹훅 콜백 사용 시):**
+   ```bash
+   docker-compose --profile ngrok up -d --build
+   ```
+   
+   이 명령어로 다음 서비스들이 실행됩니다:
+   - 웹 서버 (Django): `http://localhost:8000`
+   - 데이터베이스 (PostgreSQL): `localhost:5433`
+   - 메시지 브로커 (RabbitMQ): `localhost:5672`, 관리 UI: `http://localhost:15672`
+   - Celery 워커 (비동기 작업 처리)
+   - ngrok (선택적): `http://localhost:4040`
 
 4.  **데이터베이스 마이그레이션**
     - 컨테이너가 실행된 후, 데이터베이스에 필요한 테이블들을 생성해야 합니다.
@@ -105,43 +126,66 @@ SUNO_CALLBACK_URL=https://your-public-url.com/api/music/webhook/suno/  # Webhook
 
 Suno API는 음악 생성이 완료되면 콜백 URL로 결과를 전송합니다. 로컬 개발 환경에서는 터널링 서비스를 사용해야 합니다.
 
-#### 방법 1: ngrok 사용 (권장)
+#### 방법 1: Docker로 ngrok 사용 (권장)
 
-1. **ngrok 설치** (이미 설치되어 있으면 생략)
+Docker 환경에 ngrok이 통합되어 있어 별도 설치 없이 사용할 수 있습니다.
+
+1. **Ngrok 계정 생성 및 토큰 발급**
+   - https://dashboard.ngrok.com/signup 에서 계정 생성
+   - https://dashboard.ngrok.com/get-started/your-authtoken 에서 인증 토큰 발급
+
+2. **환경 변수 설정**
+   ```bash
+   # .env 파일에 추가
+   NGROK_AUTHTOKEN=your_ngrok_authtoken_here
+   ```
+
+3. **Ngrok과 함께 서버 시작**
+   ```bash
+   # ngrok 프로필을 포함하여 실행
+   docker-compose --profile ngrok up -d
+   ```
+
+4. **Ngrok URL 확인**
+   - **간편한 방법 (스크립트 사용)**:
+     ```bash
+     ./get_ngrok_url.sh
+     ```
+   - **ngrok 웹 UI**: http://localhost:4040 에서 터널 상태 확인
+   - **터널 URL 확인 (수동)**:
+     ```bash
+     curl http://localhost:4040/api/tunnels | jq '.tunnels[0].public_url'
+     ```
+
+5. **콜백 URL 설정**
+   - 확인한 ngrok URL을 `.env` 파일에 추가:
+     ```bash
+     SUNO_CALLBACK_URL=https://xxxxx.ngrok.io/api/v1/webhook/suno/
+     ```
+   - 서버 재시작:
+     ```bash
+     docker-compose restart web
+     ```
+
+#### 방법 1-1: 호스트에서 ngrok 직접 실행 (대안)
+
+Docker 없이 호스트에서 직접 실행하려면:
+
+1. **ngrok 설치**
    ```bash
    # macOS
    brew install ngrok
-   
-   # 또는 ngrok.com에서 다운로드
    ```
 
-2. **ngrok 인증 토큰 설정** (최초 1회만)
+2. **인증 토큰 설정**
    ```bash
-   # ngrok 계정 생성: https://dashboard.ngrok.com/signup
-   # 인증 토큰 발급: https://dashboard.ngrok.com/get-started/your-authtoken
-   
-   # 인증 토큰 설정
    ngrok config add-authtoken YOUR_AUTHTOKEN
    ```
 
-3. **ngrok 터널 설정**
+3. **ngrok 실행**
    ```bash
-   # 자동 설정 스크립트 사용 (권장)
-   ./setup_ngrok_with_auth.sh
-   
-   # 또는 수동 설정
    ngrok http 8000
    ```
-
-4. **콜백 URL 확인**
-   - ngrok 실행 후 표시되는 `https://xxxxx.ngrok.io` URL 사용
-   - `.env` 파일에 추가:
-     ```bash
-     SUNO_CALLBACK_URL=https://xxxxx.ngrok.io/api/music/webhook/suno/
-     ```
-
-5. **ngrok 대시보드**
-   - http://localhost:4040 에서 터널 상태 확인
 
 #### 방법 2: 다른 터널링 서비스
 

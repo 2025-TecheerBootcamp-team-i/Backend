@@ -4,7 +4,7 @@ Celery 비동기 작업 정의
 from celery import shared_task
 from django.utils import timezone
 from .models import Music, AiInfo, Users, Artists, Albums
-from .services import LlamaService, SunoAPIService
+from .music_generate.services import LlamaService, SunoAPIService
 from .music_generate.utils import extract_genre_from_prompt
 
 

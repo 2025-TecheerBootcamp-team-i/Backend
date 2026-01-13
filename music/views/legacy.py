@@ -362,7 +362,7 @@ def generate_music_async(request):
         "message": "음악 생성이 시작되었습니다."
     }
     """
-    from .tasks import generate_music_task
+    from ..tasks import generate_music_task
     
     # 커스텀 파서가 자동으로 처리
     data = request.data
