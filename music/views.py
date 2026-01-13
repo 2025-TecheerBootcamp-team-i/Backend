@@ -2,8 +2,7 @@
 Music 앱의 View 모듈
 음악, 인증 관련 API 엔드포인트 처리
 """
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -14,7 +13,6 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import check_password
 from .models import Users, Music, MusicLikes, MusicTags, Tags, Artists, Albums
 from .serializers import (
-    MusicListSerializer, 
     MusicDetailSerializer, 
     MusicLikeSerializer,
     UserRegisterSerializer,
@@ -33,67 +31,6 @@ class MusicPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
     max_page_size = 100
-
-
-class MusicViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    음악 목록 및 상세 조회 ViewSet
-    
-    - list: 음악 목록 조회 (검색, 필터링 지원)
-    - retrieve: 음악 상세 조회
-    """
-    pagination_class = MusicPagination
-    permission_classes = [AllowAny]
-    
-    def get_queryset(self):
-        """
-        QuerySet 생성 (is_deleted=False만 조회)
-        검색 및 필터링 지원
-        """
-        queryset = Music.objects.filter(is_deleted=False).select_related(
-            'artist', 'album'
-        ).order_by('-created_at')
-        
-        # 검색 (음악명, 아티스트명)
-        search = self.request.query_params.get('search')
-        if search:
-            queryset = queryset.filter(
-                Q(music_name__icontains=search) |
-                Q(artist__artist_name__icontains=search)
-            )
-        
-        # 장르 필터링
-        genre = self.request.query_params.get('genre')
-        if genre:
-            queryset = queryset.filter(genre__iexact=genre)
-        
-        # AI 생성곡 필터링
-        is_ai = self.request.query_params.get('is_ai')
-        if is_ai is not None:
-            is_ai_bool = is_ai.lower() in ['true', '1', 'yes']
-            queryset = queryset.filter(is_ai=is_ai_bool)
-        
-        return queryset
-    
-    def get_serializer_class(self):
-        """액션에 따라 다른 Serializer 사용"""
-        if self.action == 'retrieve':
-            return MusicDetailSerializer
-        return MusicListSerializer
-    
-    def list(self, request, *args, **kwargs):
-        """
-        음악 목록 조회
-        GET /api/v1/db/tracks
-        """
-        return super().list(request, *args, **kwargs)
-    
-    def retrieve(self, request, *args, **kwargs):
-        """
-        음악 상세 조회
-        GET /api/v1/db/tracks/{musicId}
-        """
-        return super().retrieve(request, *args, **kwargs)
 
 
 class MusicLikeView(APIView):

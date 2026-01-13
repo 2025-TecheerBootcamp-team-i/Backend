@@ -80,13 +80,6 @@ GET /api/v1/tracks/{itunes_id}
 | GET | `/api/v1/search` | iTunes 기반 검색 |
 | GET | `/api/v1/tracks/{itunes_id}` | iTunes ID로 상세 조회 |
 
-### 기존 엔드포인트 (호환성 유지)
-
-| 메서드 | 경로 | 설명 |
-|--------|------|------|
-| GET | `/api/v1/db/tracks` | DB 직접 조회 (개발자용) |
-| GET | `/api/v1/db/tracks/{music_id}` | DB music_id로 조회 |
-
 ## 검색 파라미터
 
 ### `/api/v1/search`

@@ -2,21 +2,15 @@
 """
 Music 앱의 URL 라우팅
 """
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     RegisterView, 
     LoginView, 
-    MusicViewSet, 
     MusicLikeView,
     MusicSearchView,
     MusicDetailView
 )
-
-# Router 설정 (ViewSet 자동 라우팅)
-router = DefaultRouter()
-router.register(r'db/tracks', MusicViewSet, basename='music')
 
 app_name = 'music'
 
@@ -38,9 +32,4 @@ urlpatterns = [
     # POST /api/v1/tracks/{music_id}/likes
     # DELETE /api/v1/tracks/{music_id}/likes
     path('tracks/<int:music_id>/likes', MusicLikeView.as_view(), name='music-like'),
-    
-    # 기존 DB 직접 조회 엔드포인트 (호환성 유지)
-    # GET /api/v1/db/tracks - 음악 목록
-    # GET /api/v1/db/tracks/{id} - 음악 상세
-    path('', include(router.urls)),
 ]

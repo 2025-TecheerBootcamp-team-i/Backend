@@ -43,20 +43,6 @@ class AiInfoSerializer(serializers.ModelSerializer):
         fields = ['aiinfo_id', 'input_prompt', 'created_at']
 
 
-class MusicListSerializer(serializers.ModelSerializer):
-    """음악 목록 조회용 Serializer (간단한 정보만)"""
-    artist = ArtistSerializer(read_only=True)
-    album = AlbumSerializer(read_only=True)
-    
-    class Meta:
-        model = Music
-        fields = [
-            'music_id', 'music_name', 'artist', 'album', 
-            'genre', 'duration', 'is_ai', 'audio_url', 
-            'created_at'
-        ]
-
-
 class MusicDetailSerializer(serializers.ModelSerializer):
     """음악 상세 조회용 Serializer (모든 정보 포함)"""
     artist = ArtistSerializer(read_only=True)
