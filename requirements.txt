@@ -40,6 +40,6 @@ python-dotenv                       # .env 파일에서 환경 변수 로드
 gunicorn                            # WSGI HTTP 서버 (프로덕션 배포용)
 
 # ==============================================
-# 로그인 및 회원가입
+# API 문서화
 # ==============================================
-djangorestframework-simplejwt>=5.3.0
+drf-spectacular                     # Swagger/OpenAPI 문서 자동 생성
