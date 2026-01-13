@@ -28,6 +28,15 @@ from .auth import (
     UserLoginSerializer,
 )
 
+# 차트 관련 Serializers
+from .charts import (
+    PlayLogCreateSerializer,
+    PlayLogResponseSerializer,
+    ChartMusicSerializer,
+    ChartItemSerializer,
+    ChartResponseSerializer,
+)
+
 # 외부에서 사용 가능한 모든 클래스
 __all__ = [
     # base
@@ -43,4 +52,10 @@ __all__ = [
     # auth
     'UserRegisterSerializer',
     'UserLoginSerializer',
+    # charts
+    'PlayLogCreateSerializer',
+    'PlayLogResponseSerializer',
+    'ChartMusicSerializer',
+    'ChartItemSerializer',
+    'ChartResponseSerializer',
 ]

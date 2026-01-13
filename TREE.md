@@ -1,6 +1,6 @@
 # 📁 프로젝트 파일 구조
 
-> 마지막 업데이트: 2026-01-13 (앱 내부 모듈화 완료)
+> 마지막 업데이트: 2026-01-13 (차트 API 구현)
 
 ```
 Backend/
@@ -8,7 +8,7 @@ Backend/
 │
 ├── 📂 config/                # Django 프로젝트 설정 폴더
 │   ├── __init__.py          # config 패키지 초기화
-│   ├── settings.py          # Django 설정 (DB, Celery, 환경변수 등)
+│   ├── settings.py          # Django 설정 (DB, Celery Beat 스케줄 등)
 │   ├── urls.py              # URL 라우팅 설정
 │   ├── wsgi.py              # WSGI 애플리케이션 (배포용)
 │   ├── asgi.py              # ASGI 애플리케이션 (비동기 지원)
@@ -18,8 +18,9 @@ Backend/
 │   ├── __init__.py
 │   ├── admin.py             # Django Admin 등록
 │   ├── apps.py              # 앱 설정
-│   ├── models.py            # 데이터 모델 (Music, Artists, Albums 등)
+│   ├── models.py            # 데이터 모델 (Music, Charts, PlayLogs 등)
 │   ├── urls.py              # URL 라우팅
+│   ├── tasks.py             # Celery 작업 (차트 계산, 데이터 정리)
 │   ├── tests.py             # 테스트
 │   │
 │   ├── 📂 serializers/      # Serializers 모듈 (JSON 직렬화)
@@ -27,7 +28,8 @@ Backend/
 │   │   ├── base.py          # 기본 (Artist, Album, Tag, AiInfo)
 │   │   ├── music.py         # 음악 관련 (MusicDetail, MusicLike)
 │   │   ├── search.py        # 검색 관련 (iTunesSearchResult)
-│   │   └── auth.py          # 인증 관련 (UserRegister, UserLogin)
+│   │   ├── auth.py          # 인증 관련 (UserRegister, UserLogin)
+│   │   └── charts.py        # 차트 관련 (PlayLog, ChartItem, ChartResponse)
 │   │
 │   ├── 📂 views/            # Views 모듈 (API 엔드포인트)
 │   │   ├── __init__.py      # 모든 View export
@@ -35,7 +37,9 @@ Backend/
 │   │   ├── auth.py          # 인증 관련 (Register, Login)
 │   │   ├── likes.py         # 좋아요 관련 (MusicLike)
 │   │   ├── search.py        # 검색 관련 (MusicSearch)
-│   │   └── music.py         # 음악 상세 관련 (MusicDetail)
+│   │   ├── music.py         # 음악 상세 관련 (MusicDetail)
+│   │   ├── playlogs.py      # 재생 기록 관련 (PlayLog)
+│   │   └── charts.py        # 차트 관련 (Chart 조회)
 │   │
 │   ├── 📂 services/         # 외부 API 서비스
 │   │   ├── __init__.py      # 모든 Service export
@@ -63,15 +67,24 @@ Backend/
 - [x] **Phase 2**: 인증 및 핵심 도메인 (User, Music, Playlist)
 - [x] **Phase 3-1**: iTunes API 통합 (검색 우선 구조)
 - [x] **앱 모듈화**: views/, serializers/, services/ 폴더 구조화
+- [x] **Phase 4**: 차트 API 구현 (실시간/일일/AI 차트)
 - [ ] **Phase 3-2**: 외부 API (LRCLIB) 및 비동기 작업 (Celery)
-- [ ] **Phase 4**: 데이터 시각화 및 최적화 (play_log, 차트)
 - [ ] **Phase 5**: 클라우드 이관 (AWS RDS, MQ, EC2)
 
 ## 📝 주요 변경사항
 
+### 2026-01-13 - 차트 API 구현
+- ✅ 실시간 차트 (10분마다, 최근 3시간 집계)
+- ✅ 일일 차트 (매일 자정, 전날 전체 집계)
+- ✅ AI 차트 (매일 자정, AI 곡만 집계)
+- ✅ 재생 기록 API (POST /tracks/{id}/play)
+- ✅ 차트 조회 API (GET /charts/{type})
+- ✅ Celery Beat 스케줄 설정
+- ✅ 데이터 정리 작업 (PlayLogs 90일, 실시간 차트 7일)
+
 ### 2026-01-13 - 앱 내부 모듈화
-- ✅ `music/views/` 폴더 생성 (auth, likes, search, music)
-- ✅ `music/serializers/` 폴더 생성 (base, music, search, auth)
+- ✅ `music/views/` 폴더 생성 (auth, likes, search, music, playlogs, charts)
+- ✅ `music/serializers/` 폴더 생성 (base, music, search, auth, charts)
 - ✅ `music/services/` 폴더 생성 (itunes)
 - ✅ `__init__.py`에서 모든 클래스 export (기존 import 호환)
 - ✅ 기능별 파일 분리로 협업 충돌 감소
@@ -88,6 +101,8 @@ Backend/
 - `GET /api/v1/tracks/{itunes_id}` - 상세 조회 (자동 저장)
 - `POST /api/v1/tracks/{music_id}/likes` - 좋아요 등록
 - `DELETE /api/v1/tracks/{music_id}/likes` - 좋아요 취소
+- `POST /api/v1/tracks/{music_id}/play` - 재생 기록 저장
+- `GET /api/v1/charts/{type}` - 차트 조회 (realtime|daily|ai)
 - `POST /api/v1/auth/users/` - 회원가입
 - `POST /api/v1/auth/tokens/` - 로그인
 - `POST /api/v1/auth/refresh/` - 토큰 갱신

@@ -21,6 +21,12 @@ from .search import MusicSearchView
 # 음악 상세 관련 Views
 from .music import MusicDetailView
 
+# 재생 기록 관련 Views
+from .playlogs import PlayLogView
+
+# 차트 관련 Views
+from .charts import ChartView
+
 # 외부에서 사용 가능한 모든 클래스
 __all__ = [
     # common
@@ -34,4 +40,8 @@ __all__ = [
     'MusicSearchView',
     # music
     'MusicDetailView',
+    # playlogs
+    'PlayLogView',
+    # charts
+    'ChartView',
 ]

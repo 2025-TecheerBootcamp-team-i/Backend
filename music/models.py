@@ -124,12 +124,24 @@ class AuthUserUserPermissions(models.Model):
 
 
 class Charts(models.Model):
+    """
+    차트 스냅샷 테이블
+    - realtime: 실시간 차트 (10분마다 갱신, 최근 3시간 집계)
+    - daily: 일일 차트 (매일 자정 갱신, 어제 전체 집계)
+    - ai: AI 곡 차트 (매일 자정 갱신, AI 곡만)
+    """
+    CHART_TYPE_CHOICES = [
+        ('realtime', '실시간 차트'),
+        ('daily', '일일 차트'),
+        ('ai', 'AI 차트'),
+    ]
+    
     chart_id = models.AutoField(primary_key=True)
     music = models.ForeignKey('Music', models.DO_NOTHING, blank=True, null=True)
     play_count = models.IntegerField(blank=True, null=True)
     chart_date = models.DateTimeField(blank=True, null=True)
     rank = models.IntegerField(blank=True, null=True)
-    type = models.TextField(blank=True, null=True)  # This field type is a guess.
+    type = models.TextField(choices=CHART_TYPE_CHOICES, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     is_deleted = models.BooleanField(blank=True, null=True)
@@ -301,13 +313,19 @@ class MusicTags(models.Model):
 
 
 class PlayLogs(models.Model):
+    """
+    재생 기록 테이블
+    - 사용자가 음악을 재생할 때마다 기록
+    - 차트 집계의 원본 데이터로 사용
+    - 90일 후 물리 삭제
+    """
     play_log_id = models.AutoField(primary_key=True)
-    music = models.ForeignKey(Music, models.DO_NOTHING, blank=True, null=True)
-    user = models.ForeignKey('Users', models.DO_NOTHING, blank=True, null=True)
-    played_at = models.DateTimeField(blank=True, null=True)
+    music = models.ForeignKey(Music, models.DO_NOTHING)  # 필수
+    user = models.ForeignKey('Users', models.DO_NOTHING)  # 필수 (로그인 필수 서비스)
+    played_at = models.DateTimeField()  # 재생 시점
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    is_deleted = models.BooleanField(default=False)
 
     class Meta:
         managed = False

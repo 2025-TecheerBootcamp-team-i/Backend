@@ -1,4 +1,3 @@
-
 """
 Music 앱의 URL 라우팅
 """
@@ -9,7 +8,9 @@ from .views import (
     LoginView, 
     MusicLikeView,
     MusicSearchView,
-    MusicDetailView
+    MusicDetailView,
+    PlayLogView,
+    ChartView,
 )
 
 app_name = 'music'
@@ -32,4 +33,12 @@ urlpatterns = [
     # POST /api/v1/tracks/{music_id}/likes
     # DELETE /api/v1/tracks/{music_id}/likes
     path('tracks/<int:music_id>/likes', MusicLikeView.as_view(), name='music-like'),
+    
+    # 재생 기록
+    # POST /api/v1/tracks/{music_id}/play
+    path('tracks/<int:music_id>/play', PlayLogView.as_view(), name='play-log'),
+    
+    # 차트 조회
+    # GET /api/v1/charts/{type} (realtime|daily|ai)
+    path('charts/<str:type>', ChartView.as_view(), name='charts'),
 ]
