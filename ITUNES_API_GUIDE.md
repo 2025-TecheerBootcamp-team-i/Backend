@@ -13,34 +13,76 @@ iTunes Search API를 활용한 음악 검색 시스템이 구현되었습니다.
 
 ### 2. 고급 검색 문법
 
+#### 태그 인식 규칙 ⭐
+
+**'# ' (해시 + 공백) 패턴만 태그로 인식**
+- `# christmas` → 태그 검색
+- `#christmas` → 일반 텍스트 (태그 아님)
+- `C#` → 일반 검색 (C# 프로그래밍 음악 등)
+- `I'm #1` → 일반 검색 (태그 아님)
+
 #### 일반 검색
 ```bash
 GET /api/v1/search?q=아이유
+GET /api/v1/search?q=C%23  # C# 검색
 ```
-- iTunes API에서 "아이유" 검색
-- 결과: 아티스트명 또는 곡명에 "아이유" 포함된 곡
+- iTunes API에서 검색
+- 결과: 아티스트명 또는 곡명에 포함된 곡
 
 #### 태그만 검색
 ```bash
-GET /api/v1/search?q=%23christmas
-# 또는 URL 인코딩 없이: ?q=#christmas
+GET /api/v1/search?q=%23%20christmas
+# 또는 URL 인코딩 없이: ?q=# christmas
 ```
+- ⚠️ **공백 필수**: `# christmas` (O), `#christmas` (X)
 - DB에서 "christmas" 태그를 가진 곡만 조회
 - iTunes API 호출 안 함
 
 #### 복합 검색 (검색어 + 태그)
 ```bash
-GET /api/v1/search?q=아이유%23christmas
-# 또는: ?q=아이유#christmas
+GET /api/v1/search?q=아이유%20%23%20christmas
+# 또는: ?q=아이유 # christmas
 ```
+- ⚠️ **공백 필수**: `아이유 # christmas` (O), `아이유#christmas` (X)
 - iTunes에서 "아이유" 검색
 - 결과 중 DB에 "christmas" 태그가 있는 곡만 필터링
 
-#### AI 필터
+#### 여러 태그 검색
 ```bash
+GET /api/v1/search?q=jazz%20%23%20relax%20%23%20night
+# 또는: ?q=jazz # relax # night
+```
+- "jazz" 검색 + "relax"와 "night" 태그 모두 가진 곡
+
+#### AI 곡 필터링
+
+**방식 1: 서버 사이드 필터링 (권장)**
+```bash
+# 처음부터 AI 곡 제외하고 검색
 GET /api/v1/search?q=아이유&exclude_ai=true
 ```
-- AI 생성곡 제외 (기성곡만 조회)
+
+**방식 2: 클라이언트 사이드 필터링**
+```bash
+# 전체 결과 받기
+GET /api/v1/search?q=아이유
+
+# 응답에 is_ai 필드 포함됨
+{
+  "results": [
+    {"music_name": "Celebrity", "is_ai": false},
+    {"music_name": "AI Generated", "is_ai": true}
+  ]
+}
+
+# 프론트엔드에서 필터링
+const filtered = results.filter(item => !item.is_ai);
+```
+
+**추천 UX 흐름:**
+1. 검색 결과 표시 (AI곡 포함)
+2. "AI 생성곡 제외" 버튼 클릭 시 → `exclude_ai=true`로 재요청
+3. 또는 클라이언트에서 `is_ai` 필드로 필터링
 
 ### 3. 상세 조회 (자동 저장)
 

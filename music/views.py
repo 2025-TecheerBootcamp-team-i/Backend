@@ -204,17 +204,27 @@ class MusicSearchView(APIView):
         """
         검색어 파싱: 일반 검색어와 태그 분리
         
+        규칙: '# ' (해시+공백) 패턴만 태그로 인식
+        
         예시:
         - "아이유" → {"term": "아이유", "tags": []}
-        - "#christmas" → {"term": None, "tags": ["christmas"]}
-        - "아이유#christmas#신나는" → {"term": "아이유", "tags": ["christmas", "신나는"]}
+        - "# christmas" → {"term": None, "tags": ["christmas"]}
+        - "아이유 # christmas" → {"term": "아이유", "tags": ["christmas"]}
+        - "아이유 # christmas # 신나는" → {"term": "아이유", "tags": ["christmas", "신나는"]}
+        - "C#" → {"term": "C#", "tags": []} (공백 없으면 일반 텍스트)
+        - "I'm #1" → {"term": "I'm #1", "tags": []} (공백 없으면 일반 텍스트)
         """
         if not query_string:
             return {"term": None, "tags": []}
         
-        parts = query_string.split('#')
-        term = parts[0].strip() if parts[0].strip() else None
-        tags = [tag.strip() for tag in parts[1:] if tag.strip()]
+        import re
+        # '# ' (해시+공백) 뒤의 단어들을 태그로 추출
+        tag_pattern = r'#\s+(\w+)'
+        tags = re.findall(tag_pattern, query_string)
+        
+        # 태그 패턴 제거한 나머지가 검색어
+        term = re.sub(tag_pattern, '', query_string).strip()
+        term = term if term else None
         
         return {"term": term, "tags": tags}
     
@@ -225,8 +235,13 @@ class MusicSearchView(APIView):
         
         **검색 문법:**
         - `아이유` - 일반 검색
-        - `#christmas` - 태그만 검색
-        - `아이유#christmas` - 검색어 + 태그 (AND 조건)
+        - `# christmas` - 태그만 검색 (# 뒤 공백 필수)
+        - `아이유 # christmas` - 검색어 + 태그 (AND 조건)
+        - `C#` - 일반 검색 (공백 없으면 태그 아님)
+        
+        **태그 규칙:**
+        - '# ' (해시+공백) 패턴만 태그로 인식
+        - 프론트: # 입력 → 스페이스바 → 태그 입력 모드
         
         **동작:**
         1. 일반 검색어가 있으면 iTunes API 호출
@@ -238,7 +253,7 @@ class MusicSearchView(APIView):
                 name='q',
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
-                description='검색어 (예: "아이유", "#christmas", "아이유#christmas")',
+                description='검색어 (# 뒤 공백 있어야 태그 인식)',
                 required=True,
                 examples=[
                     OpenApiExample(
@@ -248,13 +263,18 @@ class MusicSearchView(APIView):
                     ),
                     OpenApiExample(
                         name='태그 검색',
-                        value='#christmas',
-                        description='DB에서 태그만 검색'
+                        value='# christmas',
+                        description='DB에서 태그만 검색 (공백 필수)'
                     ),
                     OpenApiExample(
                         name='복합 검색',
-                        value='아이유#christmas',
-                        description='검색어 + 태그 (AND 조건)'
+                        value='아이유 # christmas',
+                        description='검색어 + 태그 (AND 조건, 공백 필수)'
+                    ),
+                    OpenApiExample(
+                        name='일반 텍스트 (태그 아님)',
+                        value='C#',
+                        description='공백 없으면 일반 검색 (C# 프로그래밍 음악 등)'
                     ),
                 ]
             ),
@@ -262,7 +282,7 @@ class MusicSearchView(APIView):
                 name='exclude_ai',
                 type=OpenApiTypes.BOOL,
                 location=OpenApiParameter.QUERY,
-                description='AI 생성곡 제외 여부',
+                description='AI 생성곡 제외 여부 (기본값: false - AI곡 포함)\n응답의 is_ai 필드로 클라이언트 사이드 필터링도 가능',
                 required=False,
                 default=False
             ),
