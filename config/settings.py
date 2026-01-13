@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'rest_framework', # Django REST Framework
     'rest_framework_simplejwt', # JWT 인증 (Access/Refresh 토큰)
     'corsheaders', # CORS 설정 (프론트엔드와 통신)
+    'drf_spectacular', # Swagger/OpenAPI 문서 자동 생성
     'django_celery_results', # Celery 작업 결과를 DB에 저장하기 위해 추가
     # Local apps
     'music', # 우리가 만든 'music' 앱 추가
@@ -166,6 +167,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.AllowAny',
     ),
+    
+    # Swagger/OpenAPI 스키마 생성 (API 문서 자동화)
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 from datetime import timedelta
@@ -238,3 +242,17 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',         # CSRF 보호 토큰
     'x-requested-with',    # AJAX 요청 식별
 ]
+
+# ==============================================
+# drf-spectacular (Swagger/OpenAPI) 설정
+# ==============================================
+# API 문서 자동 생성 도구의 상세 설정
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Music Streaming & AI Generation API',
+    'DESCRIPTION': '음악 스트리밍 및 AI 음악 생성 플랫폼 Backend API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # JWT 인증 스키마 설정
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/api/v1/',
+}

@@ -96,6 +96,21 @@ class MusicDetailSerializer(serializers.ModelSerializer):
             return None
 
 
+class iTunesSearchResultSerializer(serializers.Serializer):
+    """iTunes 검색 결과용 Serializer (간단한 정보만)"""
+    itunes_id = serializers.IntegerField()
+    music_name = serializers.CharField()
+    artist_name = serializers.CharField()
+    album_name = serializers.CharField()
+    genre = serializers.CharField()
+    duration = serializers.IntegerField(allow_null=True)
+    audio_url = serializers.CharField(allow_null=True)  # preview URL
+    album_image = serializers.CharField(allow_null=True)  # artwork
+    is_ai = serializers.BooleanField(default=False)
+    in_db = serializers.BooleanField(default=False)  # DB에 이미 저장되어 있는지 여부
+    has_matching_tags = serializers.BooleanField(default=False)  # 태그 검색 시 매칭 여부
+
+
 class MusicLikeSerializer(serializers.Serializer):
     """좋아요 응답용 Serializer"""
     message = serializers.CharField()
