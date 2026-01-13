@@ -1,0 +1,51 @@
+"""
+음악 관련 Serializers - 음악 상세, 좋아요
+"""
+from rest_framework import serializers
+from ..models import Music, MusicTags, AiInfo
+from .base import ArtistSerializer, AlbumSerializer, TagSerializer, AiInfoSerializer
+
+
+class MusicDetailSerializer(serializers.ModelSerializer):
+    """음악 상세 조회용 Serializer (모든 정보 포함)"""
+    artist = ArtistSerializer(read_only=True)
+    album = AlbumSerializer(read_only=True)
+    tags = serializers.SerializerMethodField()
+    ai_info = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Music
+        fields = [
+            'music_id', 'music_name', 'artist', 'album', 
+            'genre', 'duration', 'is_ai', 'audio_url', 
+            'lyrics', 'valence', 'arousal', 'itunes_id',
+            'tags', 'ai_info', 'created_at', 'updated_at'
+        ]
+    
+    def get_tags(self, obj):
+        """음악에 연결된 태그 목록 조회"""
+        music_tags = MusicTags.objects.filter(
+            music=obj, 
+            is_deleted=False
+        ).select_related('tag')
+        
+        tags = [mt.tag for mt in music_tags if not mt.tag.is_deleted]
+        return TagSerializer(tags, many=True).data
+    
+    def get_ai_info(self, obj):
+        """AI 생성 정보 조회 (있는 경우만)"""
+        if not obj.is_ai:
+            return None
+        
+        try:
+            ai_info = AiInfo.objects.get(music=obj, is_deleted=False)
+            return AiInfoSerializer(ai_info).data
+        except AiInfo.DoesNotExist:
+            return None
+
+
+class MusicLikeSerializer(serializers.Serializer):
+    """좋아요 응답용 Serializer"""
+    message = serializers.CharField()
+    music_id = serializers.IntegerField()
+    is_liked = serializers.BooleanField()

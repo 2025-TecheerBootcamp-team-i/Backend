@@ -42,7 +42,7 @@ services:
   # Celery 워커 서비스 (비동기 작업 처리)
   celery:
     build: .
-    command: celery -A celery_app worker -l info # Celery 워커 실행 명령어
+    command: celery -A config worker -l info # Celery 워커 실행 명령어
     volumes:
       - ./:/usr/src/app/ # 현재 디렉토리를 컨테이너의 /usr/src/app에 마운트
     env_file:
