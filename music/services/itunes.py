@@ -4,7 +4,6 @@ iTunes Search API와 Lookup API를 사용하여 음악 정보를 조회합니다
 """
 import requests
 from typing import Dict, List, Optional
-from django.conf import settings
 
 
 class iTunesService:
