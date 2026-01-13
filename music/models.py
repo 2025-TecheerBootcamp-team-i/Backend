@@ -11,6 +11,7 @@ from django.db import models
 class AiInfo(models.Model):
     aiinfo_id = models.AutoField(primary_key=True)
     music = models.ForeignKey('Music', models.DO_NOTHING, blank=True, null=True)
+    task_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)  # Suno API taskId 저장
     input_prompt = models.CharField(max_length=500, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)

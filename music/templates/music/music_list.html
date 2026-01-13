@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 AI 음악 목록</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+        
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .refresh-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .refresh-btn:hover {
+            background: #45a049;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .music-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .music-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .music-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .music-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            word-break: break-word;
+        }
+        
+        .music-info {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+        
+        .music-info strong {
+            color: #333;
+        }
+        
+        .music-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 6px;
+        }
+        
+        .btn-play {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-play:hover {
+            background: #45a049;
+        }
+        
+        .btn-monitor {
+            background: #2196F3;
+            color: white;
+        }
+        
+        .btn-monitor:hover {
+            background: #0b7dda;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #c62828;
+        }
+        
+        .audio-player {
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .genre-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 AI 음악 목록</h1>
+        <p class="subtitle">생성된 AI 음악을 확인하고 재생하세요</p>
+        
+        <div class="header-actions">
+            <div>
+                <a href="/music/generator/" class="btn btn-primary">✨ 새 음악 생성</a>
+            </div>
+            <button onclick="loadMusicList()" class="btn refresh-btn">🔄 새로고침</button>
+        </div>
+        
+        <div id="error-container"></div>
+        
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>음악 목록을 불러오는 중...</p>
+        </div>
+        
+        <div id="music-list" class="music-grid" style="display: none;"></div>
+        
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">🎼</div>
+            <h2>아직 생성된 AI 음악이 없습니다</h2>
+            <p style="margin-top: 10px;">새 음악을 생성해보세요!</p>
+            <a href="/music/generator/" class="btn btn-primary" style="margin-top: 20px;">✨ 음악 생성하기</a>
+        </div>
+    </div>
+    
+    <script>
+        // 음악 목록 로드
+        async function loadMusicList() {
+            const loadingEl = document.getElementById('loading');
+            const musicListEl = document.getElementById('music-list');
+            const emptyStateEl = document.getElementById('empty-state');
+            const errorContainerEl = document.getElementById('error-container');
+            
+            // 초기화
+            loadingEl.style.display = 'block';
+            musicListEl.style.display = 'none';
+            emptyStateEl.style.display = 'none';
+            errorContainerEl.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/music/?is_ai=true');
+                const data = await response.json();
+                
+                loadingEl.style.display = 'none';
+                
+                if (!response.ok) {
+                    throw new Error(data.error || '음악 목록을 불러오는데 실패했습니다.');
+                }
+                
+                if (data.length === 0) {
+                    emptyStateEl.style.display = 'block';
+                    return;
+                }
+                
+                // 음악 카드 생성
+                musicListEl.innerHTML = data.map(music => {
+                    const duration = music.duration ? formatDuration(music.duration) : '-';
+                    const genre = music.genre || 'Unknown';
+                    const audioUrl = music.audio_url || '';
+                    const hasAudio = audioUrl && audioUrl !== 'null';
+                    
+                    return `
+                        <div class="music-card">
+                            <div class="music-title">${escapeHtml(music.music_name || '제목 없음')}</div>
+                            <div class="music-info">
+                                <strong>🎤 아티스트:</strong> ${escapeHtml(music.artist_name || 'AI Artist')}
+                            </div>
+                            <div class="music-info">
+                                <strong>💿 앨범:</strong> ${escapeHtml(music.album_name || '-')}
+                            </div>
+                            <div class="music-info">
+                                <strong>⏱️ 길이:</strong> ${duration}
+                            </div>
+                            <div class="music-info">
+                                <span class="genre-badge">${escapeHtml(genre)}</span>
+                            </div>
+                            ${hasAudio ? `
+                                <audio controls class="audio-player">
+                                    <source src="${escapeHtml(audioUrl)}" type="audio/mpeg">
+                                    브라우저가 오디오를 지원하지 않습니다.
+                                </audio>
+                            ` : '<p style="color: #999; font-size: 0.9em; margin-top: 10px;">⏳ 오디오 생성 중...</p>'}
+                            <div class="music-actions">
+                                ${hasAudio ? `
+                                    <a href="${escapeHtml(audioUrl)}" target="_blank" class="btn btn-small btn-play">▶️ 재생</a>
+                                ` : ''}
+                                <a href="/music/monitor/${music.music_id}/" target="_blank" class="btn btn-small btn-monitor">📊 모니터링</a>
+                            </div>
+                            <div style="margin-top: 10px; font-size: 0.8em; color: #999;">
+                                생성일: ${formatDate(music.created_at)}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                musicListEl.style.display = 'grid';
+                
+            } catch (error) {
+                loadingEl.style.display = 'none';
+                errorContainerEl.innerHTML = `
+                    <div class="error-message">
+                        <strong>❌ 오류 발생:</strong> ${escapeHtml(error.message)}
+                    </div>
+                `;
+                console.error('Error loading music list:', error);
+            }
+        }
+        
+        // 시간 포맷팅 (초 → 분:초)
+        function formatDuration(seconds) {
+            if (!seconds) return '-';
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // 날짜 포맷팅
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // HTML 이스케이프
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // 페이지 로드 시 자동으로 목록 불러오기
+        window.addEventListener('DOMContentLoaded', () => {
+            loadMusicList();
+        });
+    </script>
+</body>
+</html>

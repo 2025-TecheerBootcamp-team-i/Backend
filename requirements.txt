@@ -30,6 +30,12 @@ Pillow                              # 이미지 처리 (썸네일, 리사이징)
 requests                            # HTTP 클라이언트 (iTunes, LRCLIB, Suno API)
 
 # ==============================================
+# AI 음악 생성 (LangChain + Ollama)
+# ==============================================
+langchain-community                 # LangChain 커뮤니티 통합 (ChatOllama)
+langchain-core                      # LangChain 핵심 컴포넌트 (프롬프트, 파서)
+
+# ==============================================
 # 환경 설정
 # ==============================================
 python-dotenv                       # .env 파일에서 환경 변수 로드
