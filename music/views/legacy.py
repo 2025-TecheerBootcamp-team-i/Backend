@@ -86,17 +86,32 @@ def generate_music(request):
         print(f"[Llama 결과] style: {llama_style}")
         print(f"[Llama 결과] prompt: {llama_prompt}")
         
-        # 프롬프트 길이 확인 (200자 이내 권장)
-        if len(llama_prompt) > 200:
-            print(f"[경고] 프롬프트가 200자를 초과합니다! ({len(llama_prompt)}자)")
-            llama_prompt = llama_prompt[:200]
+        # 제목, 스타일, 프롬프트를 모두 포함한 통합 프롬프트 생성
+        # 형식: "Title: [제목], Style: [스타일], [프롬프트]"
+        combined_prompt = f"Title: {llama_title}, Style: {llama_style}, {llama_prompt}"
+        
+        # 프롬프트 길이 확인 (450자 미만으로 제한)
+        if len(combined_prompt) > 450:
+            print(f"[경고] 프롬프트가 450자를 초과합니다! ({len(combined_prompt)}자)")
+            # 프롬프트 부분만 자르기 (제목과 스타일은 유지)
+            prefix_len = len(f"Title: {llama_title}, Style: {llama_style}, ")
+            max_prompt_len = 450 - prefix_len
+            if max_prompt_len > 0:
+                combined_prompt = f"Title: {llama_title}, Style: {llama_style}, {llama_prompt[:max_prompt_len]}"
+            else:
+                # 제목과 스타일이 너무 길면 제목과 스타일도 축약
+                combined_prompt = f"Title: {llama_title[:50]}, Style: {llama_style}, {llama_prompt[:400]}"
+        
+        # 프롬프트 전체 내용 출력 (최대 450자이므로 전체 출력)
+        print(f"[통합 프롬프트] 길이: {len(combined_prompt)}자")
+        print(f"[통합 프롬프트] 내용: {combined_prompt}")
         
         # 2. Suno API로 음악 생성 (Polling 방식)
         suno_service = SunoAPIService()
         music_result = suno_service.generate_music(
-            prompt=llama_prompt,
-            style=llama_style,
-            title=llama_title,
+            prompt=combined_prompt,  # 제목, 스타일, 프롬프트 모두 포함
+            style=None,  # Non-custom Mode에서는 style 필드 사용 안 함
+            title=None,  # Non-custom Mode에서는 title 필드도 사용 안 함 (프롬프트에 포함)
             make_instrumental=make_instrumental,
             wait_audio=True,
             timeout=120  # 타임아웃 단축: 300초 → 120초 (2분)
@@ -141,6 +156,7 @@ def generate_music(request):
             api_genre = extract_field(first_song, 'genre', 'style', 'music_genre', 'category')
             valence = extract_field(first_song, 'valence', 'emotion_valence')
             arousal = extract_field(first_song, 'arousal', 'emotion_arousal')
+            audio_id = extract_field(first_song, 'audioId', 'audio_id', 'id', 'audioId')
         
         # 응답 형식 2: 직접 필드 접근 (Polling 실패 시 기본 데이터 포함)
         elif isinstance(music_result, dict):
@@ -153,6 +169,7 @@ def generate_music(request):
             api_genre = extract_field(music_result, 'genre', 'style', 'music_genre', 'category') or music_result.get('style') or llama_style
             valence = extract_field(music_result, 'valence', 'emotion_valence')
             arousal = extract_field(music_result, 'arousal', 'emotion_arousal')
+            audio_id = extract_field(music_result, 'audioId', 'audio_id', 'id', 'audioId')
         
         # 응답 형식 3: 알 수 없는 형식 또는 None
         else:
@@ -165,6 +182,7 @@ def generate_music(request):
                 lyrics = music_result.get('lyrics')
                 image_url = music_result.get('imageUrl')
                 api_genre = music_result.get('style') or music_result.get('genre') or llama_style
+                audio_id = music_result.get('audioId') or music_result.get('audio_id') or music_result.get('id')
             else:
                 audio_url = None
                 music_title = llama_title or user_prompt[:50]
@@ -172,6 +190,7 @@ def generate_music(request):
                 lyrics = None
                 image_url = None
                 api_genre = llama_style
+                audio_id = None
             valence = None
             arousal = None
         
@@ -179,6 +198,7 @@ def generate_music(request):
         
         print(f"[음악 생성 완료] 추출된 데이터:")
         print(f"  - task_id: {task_id}")
+        print(f"  - audio_id: {audio_id}")
         print(f"  - audio_url: {audio_url}")
         print(f"  - title: {music_title}")
         print(f"  - duration: {duration}")
@@ -204,6 +224,18 @@ def generate_music(request):
         now = timezone.now()
         # 장르: API 응답 > Llama 생성 > 프롬프트 추출 순으로 사용
         genre = api_genre or llama_style or extract_genre_from_prompt(llama_prompt)
+        
+        # 쉼표로 구분된 경우 첫 번째 장르만 사용 (예: "pop, dance" → "pop")
+        if genre and ',' in genre:
+            original_genre = genre
+            genre = genre.split(',')[0].strip()
+            print(f"[DB 저장] genre에서 첫 번째 값만 사용: 원본: {original_genre} → 저장: {genre}")
+        
+        # genre 필드는 max_length=50이므로 50자로 제한 (DB 오류 방지)
+        if genre and len(genre) > 50:
+            original_genre = genre
+            genre = genre[:50]
+            print(f"[DB 저장] 경고: genre가 50자를 초과하여 잘렸습니다. 원본: {original_genre[:100]}... → 저장: {genre}")
         print(f"[DB 저장] 장르 결정: {genre} (api_genre={api_genre}, llama_style={llama_style})")
         
         # DB 저장 시작 (트랜잭션 없이 단계별 저장, 각 단계에서 예외 처리)
@@ -280,6 +312,23 @@ def generate_music(request):
                 {"error": "음악 정보 저장에 실패했습니다.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
+        # 6-1. 타임스탬프 가사 가져오기 (instrumental이 아닌 경우)
+        if not make_instrumental and task_id and task_id != 'unknown' and audio_url:
+            try:
+                print(f"[타임스탬프 가사] 조회 시작: taskId={task_id}, audioId={audio_id}")
+                timestamped_lyrics = suno_service.get_timestamped_lyrics(task_id, audio_id)
+                if timestamped_lyrics:
+                    print(f"[타임스탬프 가사] 조회 성공, DB 업데이트 중...")
+                    music.lyrics = timestamped_lyrics
+                    music.updated_at = timezone.now()
+                    music.save()
+                    print(f"[타임스탬프 가사] ✅ DB 업데이트 완료")
+                else:
+                    print(f"[타임스탬프 가사] 조회 실패 또는 가사 없음 (일반 가사 유지)")
+            except Exception as e:
+                print(f"[타임스탬프 가사] 조회 중 오류 발생 (일반 가사 유지): {e}")
+                # 타임스탬프 가사 조회 실패는 치명적이지 않으므로 계속 진행
         
         try:
             # 7. AiInfo 모델에 프롬프트 정보 저장
@@ -575,6 +624,19 @@ def suno_webhook(request):
             duration = extract_field(first_music, 'duration', 'length', 'time', 'duration_seconds')
             lyrics = extract_field(first_music, 'lyrics', 'lyric', 'song_lyrics')
             genre = extract_field(first_music, 'genre', 'style', 'music_genre', 'category', 'tags') or music.genre or 'Unknown'
+            audio_id = extract_field(first_music, 'audioId', 'audio_id', 'id', 'audioId')
+            
+            # 쉼표로 구분된 경우 첫 번째 장르만 사용 (예: "pop, dance" → "pop")
+            if genre and ',' in genre:
+                original_genre = genre
+                genre = genre.split(',')[0].strip()
+                print(f"[Suno Webhook] genre에서 첫 번째 값만 사용: 원본: {original_genre} → 저장: {genre}")
+            
+            # genre 필드는 max_length=50이므로 50자로 제한 (DB 오류 방지)
+            if genre and len(genre) > 50:
+                original_genre = genre
+                genre = genre[:50]
+                print(f"[Suno Webhook] 경고: genre가 50자를 초과하여 잘렸습니다. 원본: {original_genre[:100]}... → 저장: {genre}")
             
             # 빈 문자열 처리
             audio_url = audio_url_raw.strip() if audio_url_raw and isinstance(audio_url_raw, str) else audio_url_raw
@@ -630,12 +692,31 @@ def suno_webhook(request):
             
             print(f"[Suno Webhook] 저장된 데이터:")
             print(f"  - audio_url: {audio_url}")
+            print(f"  - audio_id: {audio_id}")
             print(f"  - title: {title}")
             print(f"  - duration: {duration}")
             print(f"  - lyrics: {lyrics[:100] if lyrics else 'None'}...")
             print(f"  - image_url: {image_url}")
             print(f"  - genre: {genre}")
             print(f"  - callback_type: {callback_type}")
+            
+            # 타임스탬프 가사 가져오기 (audio_url이 있고 instrumental이 아닌 경우)
+            if audio_url and task_id and callback_type in ['first', 'complete']:
+                try:
+                    print(f"[Suno Webhook] 타임스탬프 가사 조회 시작: taskId={task_id}, audioId={audio_id}")
+                    suno_service = SunoAPIService()
+                    timestamped_lyrics = suno_service.get_timestamped_lyrics(task_id, audio_id)
+                    if timestamped_lyrics:
+                        print(f"[Suno Webhook] 타임스탬프 가사 조회 성공, DB 업데이트 중...")
+                        music.lyrics = timestamped_lyrics
+                        music.updated_at = timezone.now()
+                        music.save()
+                        print(f"[Suno Webhook] 타임스탬프 가사 ✅ DB 업데이트 완료")
+                    else:
+                        print(f"[Suno Webhook] 타임스탬프 가사 조회 실패 또는 가사 없음 (일반 가사 유지)")
+                except Exception as e:
+                    print(f"[Suno Webhook] 타임스탬프 가사 조회 중 오류 발생 (일반 가사 유지): {e}")
+                    # 타임스탬프 가사 조회 실패는 치명적이지 않으므로 계속 진행
             
             # Artist 이미지 업데이트
             if image_url:

@@ -328,13 +328,13 @@ class SunoAPIService:
                 callback_url = 'https://webhook.site/unique-uuid'
             
             data = {
-                'customMode': True,
+                'customMode': False,  # Description Mode: prompt는 음악 설명, 가사는 자동 생성
                 'instrumental': make_instrumental,
                 'model': self.model_version,
                 'callBackUrl': callback_url,
-                'prompt': prompt, 
-                'style': style,
-                'title': title or 'AI Generated Song',
+                'prompt': prompt,  # 음악 설명/스타일 (가사 아님) - 제목, 스타일, 설명 모두 포함
+                'style': '',
+                'title': '',
                 'wait_audio': True,
                 'personaId': '',
                 'negativeTags': '',
@@ -343,6 +343,7 @@ class SunoAPIService:
                 'weirdnessConstraint': 0.5,
                 'audioWeight': 0.5
             }
+            # Non-custom Mode에서는 style과 title 필드를 포함하지 않음 (프롬프트에 모두 포함)
             
             print(f"[Suno API] 생성 요청 데이터: {json.dumps(data, indent=2, ensure_ascii=False)}")
             
@@ -628,50 +629,41 @@ class SunoAPIService:
             print(f"음악 정보 조회 실패: {e}")
             return None
     
-    def get_timestamped_lyrics(self, record_id: str) -> Optional[str]:
+    def get_timestamped_lyrics(self, task_id: str, audio_id: str = None) -> Optional[str]:
         """
         타임스탬프 가사 조회 및 포맷팅
+        
+        Args:
+            task_id: Suno API taskId
+            audio_id: Suno API audioId (선택사항, 없으면 task_id 사용)
+            
+        Returns:
+            타임스탬프가 포함된 가사 문자열 또는 None
         """
         if self.test_mode:
             print(f"[Suno API] 테스트 모드: 타임스탬프 가사 Mock 데이터 반환")
             return "[0.0] [Verse]\n[1.0] Test lyrics"
         
+        # audio_id가 없으면 task_id 사용
+        if not audio_id:
+            audio_id = task_id
+        
         try:
-            endpoint1 = f'{self.api_url}/api/v1/lyrics/record-info/{record_id}'
-            endpoint2 = f'{self.api_url}/api/v1/lyrics/record-info'
+            endpoint = f'{self.api_url}/api/v1/generate/get-timestamped-lyrics'
             
-            params_list = [
-                {'taskId': record_id},
-                {'task_id': record_id},
-                {'record_id': record_id},
-                {'id': record_id},
-            ]
+            data = {
+                'taskId': task_id,
+                'audioId': audio_id
+            }
             
-            try:
-                response = requests.get(
-                    endpoint1,
-                    headers=self._get_headers(),
-                    timeout=30
-                )
-                if response.status_code != 200:
-                    raise Exception(f"HTTP {response.status_code}")
-            except:
-                response = None
-                for params in params_list:
-                    try:
-                        response = requests.get(
-                            endpoint2,
-                            headers=self._get_headers(),
-                            params=params,
-                            timeout=30
-                        )
-                        if response.status_code == 200:
-                            break
-                    except:
-                        continue
-                
-                if not response:
-                    raise Exception("모든 방법 실패")
+            print(f"[Suno API] 타임스탬프 가사 조회 요청: taskId={task_id}, audioId={audio_id}")
+            
+            response = requests.post(
+                endpoint,
+                headers=self._get_headers(),
+                json=data,
+                timeout=30
+            )
             
             if response.status_code == 200:
                 result = response.json()
@@ -679,11 +671,13 @@ class SunoAPIService:
                 if result.get('code') == 200:
                     data = result.get('data')
                     if not data:
+                        print(f"[Suno API] 타임스탬프 가사 조회: data가 없습니다.")
                         return None
                     
                     aligned_words = data.get('alignedWords', []) if isinstance(data, dict) else []
                     
                     if not aligned_words:
+                        print(f"[Suno API] 타임스탬프 가사 조회: alignedWords가 없습니다.")
                         return None
                     
                     # 타임스탬프 가사 포맷팅
@@ -701,10 +695,14 @@ class SunoAPIService:
                             else:
                                 timestamped_lyrics.append(word)
                     
-                    return '\n'.join(timestamped_lyrics)
+                    formatted_lyrics = '\n'.join(timestamped_lyrics)
+                    print(f"[Suno API] 타임스탬프 가사 조회 성공: {len(aligned_words)}개 단어")
+                    return formatted_lyrics
                 else:
+                    print(f"[Suno API] 타임스탬프 가사 조회 실패: code={result.get('code')}, msg={result.get('msg')}")
                     return None
             else:
+                print(f"[Suno API] 타임스탬프 가사 조회 실패: HTTP {response.status_code}")
                 return None
                 
         except Exception as e:
