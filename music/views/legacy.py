@@ -21,6 +21,7 @@ from ..legacy_serializers import (
 from ..music_generate.services import LlamaService, SunoAPIService
 from ..parsers import FlexibleJSONParser
 from ..music_generate.utils import extract_genre_from_prompt
+from ..tasks import upload_suno_audio_to_s3_task
 
 
 @csrf_exempt
@@ -313,6 +314,18 @@ def generate_music(request):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
+        # 6-0. Suno MP3를 S3로 비동기 업로드 (성공 시 audio_url을 S3 URL로 교체)
+        # - S3 설정이 없는 환경에서는 task 내부에서 자동으로 skip
+        # - task는 멱등적으로 동작 (이미 S3면 스킵)
+        if audio_url:
+            try:
+                file_name = f"music_{music.music_id}.mp3"
+                upload_suno_audio_to_s3_task.delay(music.music_id, audio_url, file_name)
+                print(f"[S3 Upload] enqueue 완료: music_id={music.music_id}")
+            except Exception as e:
+                # enqueue 실패는 치명적이지 않으므로 계속 진행
+                print(f"[S3 Upload] enqueue 실패(무시): {e}")
+
         # 6-1. 타임스탬프 가사 가져오기 (instrumental이 아닌 경우)
         if not make_instrumental and task_id and task_id != 'unknown' and audio_url:
             try:
@@ -690,6 +703,17 @@ def suno_webhook(request):
             music.updated_at = now
             music.save()
             
+            # Suno MP3를 S3로 비동기 업로드 (성공 시 audio_url을 S3 URL로 교체)
+            # - audio_url이 있는 경우에만 enqueue
+            # - task는 멱등적으로 동작 (이미 S3면 스킵)
+            if audio_url:
+                try:
+                    file_name = f"music_{music.music_id}.mp3"
+                    upload_suno_audio_to_s3_task.delay(music.music_id, audio_url, file_name)
+                    print(f"[S3 Upload] enqueue 완료(webhook): music_id={music.music_id}")
+                except Exception as e:
+                    print(f"[S3 Upload] enqueue 실패(webhook, 무시): {e}")
+
             print(f"[Suno Webhook] 저장된 데이터:")
             print(f"  - audio_url: {audio_url}")
             print(f"  - audio_id: {audio_id}")

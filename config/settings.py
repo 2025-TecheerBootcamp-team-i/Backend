@@ -256,3 +256,26 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
     'SCHEMA_PATH_PREFIX': '/api/v1/',
 }
+
+# ==============================================
+# AWS S3 설정 (파일 스토리지)
+# ==============================================
+# S3에 파일을 저장하려면 아래 환경 변수를 설정하세요
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
+AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', '')
+AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'ap-northeast-2')  # 서울 리전
+
+# S3 설정이 있으면 S3 사용, 없으면 로컬 저장소 사용
+if AWS_STORAGE_BUCKET_NAME:
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',  # 24시간 캐시
+    }
+    # 미디어 파일을 S3에 저장
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+else:
+    # 로컬 개발 환경: 로컬 저장소 사용
+    MEDIA_URL = 'media/'
+    MEDIA_ROOT = BASE_DIR / 'media_root'
