@@ -53,6 +53,22 @@ services:
       rabbitmq:
         condition: service_started # RabbitMQ가 시작되면 시작
 
+  # Flower 서비스 (Celery 모니터링 웹 UI)
+  flower:
+    build: .
+    command: celery -A config flower --port=5555 # Flower 웹 UI 실행
+    ports:
+      - "5555:5555" # Flower 웹 UI 포트 (http://localhost:5555)
+    volumes:
+      - ./:/usr/src/app/ # 현재 디렉토리를 컨테이너의 /usr/src/app에 마운트
+    env_file:
+      - ./.env # .env 파일에서 환경 변수 로드
+    depends_on:
+      rabbitmq:
+        condition: service_started # RabbitMQ가 시작되면 시작
+      celery:
+        condition: service_started # Celery 워커가 시작되면 시작
+
   # Ngrok 터널 서비스 (웹훅 콜백용, 선택적)
   ngrok:
     image: ngrok/ngrok:latest

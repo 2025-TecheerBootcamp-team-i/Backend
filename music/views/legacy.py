@@ -21,6 +21,8 @@ from ..legacy_serializers import (
 from ..music_generate.services import LlamaService, SunoAPIService
 from ..parsers import FlexibleJSONParser
 from ..music_generate.utils import extract_genre_from_prompt
+from ..tasks import upload_suno_audio_to_s3_task, fetch_timestamped_lyrics_task
+from ..utils.s3_upload import is_suno_url, is_s3_url
 
 
 @csrf_exempt
@@ -78,6 +80,7 @@ def generate_music(request):
             )
         
         # Llama가 생성한 파라미터 추출
+        # 제목은 이제 Llama가 만든 것을 쓰지 않고, 사용자가 입력한 내용을 그대로 사용
         llama_title = music_params.get('title', user_prompt[:50])
         llama_style = music_params.get('style', 'K-Pop')
         llama_prompt = music_params.get('prompt', '')
@@ -86,21 +89,16 @@ def generate_music(request):
         print(f"[Llama 결과] style: {llama_style}")
         print(f"[Llama 결과] prompt: {llama_prompt}")
         
-        # 제목, 스타일, 프롬프트를 모두 포함한 통합 프롬프트 생성
-        # 형식: "Title: [제목], Style: [스타일], [프롬프트]"
-        combined_prompt = f"Title: {llama_title}, Style: {llama_style}, {llama_prompt}"
+        # Suno Description Mode용 최종 프롬프트 생성
+        # 요구사항: Title / Style 텍스트를 제거하고, content(프롬프트)에
+        # "사용자 입력의 영어 번역"만 넣어준다.
+        # 예) "나의 꽃이면" -> "my flower"
+        combined_prompt = llama_prompt or user_prompt
         
         # 프롬프트 길이 확인 (450자 미만으로 제한)
         if len(combined_prompt) > 450:
             print(f"[경고] 프롬프트가 450자를 초과합니다! ({len(combined_prompt)}자)")
-            # 프롬프트 부분만 자르기 (제목과 스타일은 유지)
-            prefix_len = len(f"Title: {llama_title}, Style: {llama_style}, ")
-            max_prompt_len = 450 - prefix_len
-            if max_prompt_len > 0:
-                combined_prompt = f"Title: {llama_title}, Style: {llama_style}, {llama_prompt[:max_prompt_len]}"
-            else:
-                # 제목과 스타일이 너무 길면 제목과 스타일도 축약
-                combined_prompt = f"Title: {llama_title[:50]}, Style: {llama_style}, {llama_prompt[:400]}"
+            combined_prompt = combined_prompt[:450]
         
         # 프롬프트 전체 내용 출력 (최대 450자이므로 전체 출력)
         print(f"[통합 프롬프트] 길이: {len(combined_prompt)}자")
@@ -149,10 +147,11 @@ def generate_music(request):
             print(f"[데이터 추출] sunoData 리스트 형식 발견 (길이: {len(suno_data)})")
             first_song = suno_data[0]
             audio_url = extract_field(first_song, 'audioUrl', 'audio_url', 'url', 'audio', 'audioFile')
-            music_title = extract_field(first_song, 'title', 'name', 'song_name', 'songName') or llama_title or user_prompt[:50]
+            # 제목은 Suno가 생성한 제목을 우선 사용하고, 없으면 사용자 입력을 fallback으로 사용
+            music_title = extract_field(first_song, 'title', 'name', 'song_name', 'songName') or user_prompt[:50]
             duration = extract_field(first_song, 'duration', 'length', 'time', 'duration_seconds')
             lyrics = extract_field(first_song, 'lyrics', 'lyric', 'text', 'song_lyrics')
-            image_url = extract_field(first_song, 'imageUrl', 'image_url', 'image', 'cover', 'coverUrl', 'cover_url')
+            image_url = extract_field(first_song, 'imageUrl', 'image_url', 'image', 'cover', 'cover_url', 'cover_url')
             api_genre = extract_field(first_song, 'genre', 'style', 'music_genre', 'category')
             valence = extract_field(first_song, 'valence', 'emotion_valence')
             arousal = extract_field(first_song, 'arousal', 'emotion_arousal')
@@ -162,22 +161,24 @@ def generate_music(request):
         elif isinstance(music_result, dict):
             print(f"[데이터 추출] 직접 필드 접근 형식")
             audio_url = extract_field(music_result, 'audioUrl', 'audio_url', 'url', 'audio', 'audioFile')
-            music_title = extract_field(music_result, 'title', 'name', 'song_name', 'songName') or music_result.get('title') or llama_title or user_prompt[:50]
+            # 제목은 Suno가 생성한 제목을 우선 사용하고, 없으면 사용자 입력을 fallback으로 사용
+            music_title = extract_field(music_result, 'title', 'name', 'song_name', 'songName') or music_result.get('title') or user_prompt[:50]
             duration = extract_field(music_result, 'duration', 'length', 'time', 'duration_seconds')
             lyrics = extract_field(music_result, 'lyrics', 'lyric', 'text', 'song_lyrics')
-            image_url = extract_field(music_result, 'imageUrl', 'image_url', 'image', 'cover', 'coverUrl', 'cover_url')
+            image_url = extract_field(music_result, 'imageUrl', 'image_url', 'image', 'cover', 'cover_url')
             api_genre = extract_field(music_result, 'genre', 'style', 'music_genre', 'category') or music_result.get('style') or llama_style
             valence = extract_field(music_result, 'valence', 'emotion_valence')
             arousal = extract_field(music_result, 'arousal', 'emotion_arousal')
             audio_id = extract_field(music_result, 'audioId', 'audio_id', 'id', 'audioId')
         
-        # 응답 형식 3: 알 수 없는 형식 또는 None
+        # 응답 형식 3: 알 수 없는 응답 형식 또는 Polling 실패
         else:
             print(f"[데이터 추출] ⚠️ 알 수 없는 응답 형식 또는 Polling 실패: {type(music_result)}")
             # Polling 실패 시에도 기본 데이터는 music_result에 포함되어 있음
             if isinstance(music_result, dict):
                 audio_url = music_result.get('audioUrl')
-                music_title = music_result.get('title') or llama_title or user_prompt[:50]
+                # 제목은 Suno가 생성한 제목을 우선 사용하고, 없으면 사용자 입력을 fallback으로 사용
+                music_title = music_result.get('title') or user_prompt[:50]
                 duration = music_result.get('duration')
                 lyrics = music_result.get('lyrics')
                 image_url = music_result.get('imageUrl')
@@ -185,7 +186,7 @@ def generate_music(request):
                 audio_id = music_result.get('audioId') or music_result.get('audio_id') or music_result.get('id')
             else:
                 audio_url = None
-                music_title = llama_title or user_prompt[:50]
+                music_title = user_prompt[:50]
                 duration = None
                 lyrics = None
                 image_url = None
@@ -313,22 +314,25 @@ def generate_music(request):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
-        # 6-1. 타임스탬프 가사 가져오기 (instrumental이 아닌 경우)
+        # 6-1. 타임스탬프 가사 가져오기 (비동기 처리 - API 응답 지연 방지)
         if not make_instrumental and task_id and task_id != 'unknown' and audio_url:
             try:
-                print(f"[타임스탬프 가사] 조회 시작: taskId={task_id}, audioId={audio_id}")
-                timestamped_lyrics = suno_service.get_timestamped_lyrics(task_id, audio_id)
-                if timestamped_lyrics:
-                    print(f"[타임스탬프 가사] 조회 성공, DB 업데이트 중...")
-                    music.lyrics = timestamped_lyrics
-                    music.updated_at = timezone.now()
-                    music.save()
-                    print(f"[타임스탬프 가사] ✅ DB 업데이트 완료")
-                else:
-                    print(f"[타임스탬프 가사] 조회 실패 또는 가사 없음 (일반 가사 유지)")
+                print(f"[타임스탬프 가사] 조회 태스크 호출: taskId={task_id}, audioId={audio_id}")
+                fetch_timestamped_lyrics_task.delay(music.music_id, task_id, audio_id)
+                print(f"[타임스탬프 가사] ✅ 태스크 큐에 추가됨 (비동기 처리)")
             except Exception as e:
-                print(f"[타임스탬프 가사] 조회 중 오류 발생 (일반 가사 유지): {e}")
+                print(f"[타임스탬프 가사] 태스크 호출 실패 (치명적이지 않음): {e}")
                 # 타임스탬프 가사 조회 실패는 치명적이지 않으므로 계속 진행
+        
+        # 6-2. S3 업로드 태스크 호출 (Suno URL인 경우)
+        if audio_url and is_suno_url(audio_url) and not is_s3_url(audio_url):
+            try:
+                print(f"[S3 업로드] 태스크 호출: music_id={music.music_id}, suno_url={audio_url}")
+                upload_suno_audio_to_s3_task.delay(music.music_id, audio_url)
+                print(f"[S3 업로드] ✅ 태스크 큐에 추가됨 (비동기 처리)")
+            except Exception as e:
+                print(f"[S3 업로드] 태스크 호출 실패 (치명적이지 않음): {e}")
+                # S3 업로드 실패는 치명적이지 않으므로 계속 진행
         
         try:
             # 7. AiInfo 모델에 프롬프트 정보 저장
@@ -531,11 +535,13 @@ def get_music_detail(request, music_id):
 @csrf_exempt  # Suno API 외부 요청이므로 CSRF 제외
 def suno_webhook(request):
     """
-    Suno API 콜백 엔드포인트
+    Suno API 콜백 엔드포인트 (즉시 응답 모드)
     
     POST /api/music/webhook/suno/
     
     Suno API가 음악 생성 완료 시 호출하는 웹훅입니다.
+    
+    이 webhook은 즉시 200 OK를 반환하고, 실제 DB 업데이트는 Celery 태스크에서 비동기로 처리합니다.
     
     Request Body:
     {
@@ -553,257 +559,63 @@ def suno_webhook(request):
         }
     }
     """
+    # Celery 태스크는 music 앱 루트의 tasks.py에 정의되어 있으므로,
+    # views 서브패키지 기준으로 한 단계 상위로 올라가서 임포트한다.
+    from ..tasks import process_suno_webhook_task
+    
     try:
+        # 요청 받자마자 즉시 로그 출력
+        print(f"[Suno Webhook] ✅ 요청 받음 ({request.META.get('CONTENT_LENGTH', '?')} bytes)")
+        
         data = request.data
         
-        # 전체 요청 데이터 로깅
-        print(f"[Suno Webhook] 받은 데이터: {json.dumps(data, indent=2, ensure_ascii=False)[:1000]}")
-        
-        # 응답 검증
-        if data.get('code') != 200:
-            print(f"[Suno Webhook] 오류 응답: {data}")
-            return Response({"status": "error", "message": data.get('msg')}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # 데이터 구조: data.data.task_id 또는 data.data.taskId
+        # 간단한 검증만 수행
         callback_data = data.get('data', {})
-        callback_type = callback_data.get('callbackType', 'complete')  # first, text, complete 등
+        task_id = callback_data.get('task_id') or callback_data.get('taskId')
         
-        # task_id 추출 (다양한 필드명 시도)
-        task_id = callback_data.get('task_id') or callback_data.get('taskId') or callback_data.get('task_id')
+        print(f"[Suno Webhook] 데이터 파싱 완료: code={data.get('code')}, taskId={task_id[:50] if task_id else 'unknown'}")
+        
+        # 기본 검증
+        if data.get('code') != 200:
+            print(f"[Suno Webhook] ⚠️ 오류 응답 받음 (code={data.get('code')})")
+            # 오류 응답도 200 OK로 반환 (Suno 재시도 방지)
+            return Response({
+                "status": "error",
+                "message": f"Suno API 오류: {data.get('msg', 'unknown')}"
+            }, status=status.HTTP_200_OK)
         
         if not task_id:
-            print(f"[Suno Webhook] task_id를 찾을 수 없습니다. 데이터 구조: {json.dumps(callback_data, indent=2, ensure_ascii=False)[:500]}")
-            return Response({"status": "error", "message": "taskId가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+            print(f"[Suno Webhook] ⚠️ taskId 없음")
+            return Response({
+                "status": "error",
+                "message": "taskId가 필요합니다."
+            }, status=status.HTTP_200_OK)
         
-        print(f"[Suno Webhook] taskId={task_id}, callbackType={callback_type} 처리 중...")
-        
-        # 음악 데이터 추출 (data.data.data 배열에서 첫 번째 항목)
-        music_list = callback_data.get('data', [])
-        
-        if not music_list or len(music_list) == 0:
-            print(f"[Suno Webhook] 음악 데이터가 없습니다. callbackType={callback_type}")
-            # callbackType이 'text'이면 아직 생성 중이므로 대기
-            if callback_type == 'text':
-                return Response({"status": "pending", "message": "음악 생성 진행 중..."}, status=status.HTTP_200_OK)
-            return Response({"status": "error", "message": "음악 데이터가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        first_music = music_list[0]
-        
-        # task_id로 AiInfo 찾기 (task_id 필드 직접 사용)
+        # 모든 무거운 작업은 Celery 태스크로 위임
+        print(f"[Suno Webhook] Celery 태스크로 전달: taskId={task_id}")
         try:
-            ai_info = AiInfo.objects.filter(
-                task_id=task_id,
-                is_deleted=False
-            ).first()
-            
-            # task_id 필드로 찾지 못하면 input_prompt에서 찾기 (하위 호환성)
-            if not ai_info:
-                ai_info = AiInfo.objects.filter(
-                    input_prompt__contains=f"TaskID: {task_id}",
-                    is_deleted=False
-                ).first()
-            
-            if not ai_info:
-                print(f"[Suno Webhook] taskId={task_id}에 해당하는 AiInfo를 찾을 수 없습니다.")
-                return Response({"status": "error", "message": "해당 작업을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-            
-            music = ai_info.music
-            
-            # 필수 필드 추출 (다양한 필드명 지원)
-            def extract_field(data_dict, *keys):
-                """여러 키 이름을 시도하여 값 추출"""
-                for key in keys:
-                    value = data_dict.get(key)
-                    if value and value != '' and value != []:
-                        return value
-                return None
-            
-            audio_url_raw = extract_field(first_music, 'audio_url', 'audioUrl', 'url', 'audio', 'audioFile', 'mp3_url', 'mp3Url', 'song_url', 'songUrl', 'source_audio_url', 'sourceAudioUrl')
-            image_url_raw = extract_field(first_music, 'image_url', 'imageUrl', 'image', 'cover', 'coverUrl', 'cover_url', 'source_image_url', 'sourceImageUrl')
-            title = extract_field(first_music, 'title', 'name', 'song_name', 'songName')
-            duration = extract_field(first_music, 'duration', 'length', 'time', 'duration_seconds')
-            lyrics = extract_field(first_music, 'lyrics', 'lyric', 'song_lyrics')
-            genre = extract_field(first_music, 'genre', 'style', 'music_genre', 'category', 'tags') or music.genre or 'Unknown'
-            audio_id = extract_field(first_music, 'audioId', 'audio_id', 'id', 'audioId')
-            
-            # 쉼표로 구분된 경우 첫 번째 장르만 사용 (예: "pop, dance" → "pop")
-            if genre and ',' in genre:
-                original_genre = genre
-                genre = genre.split(',')[0].strip()
-                print(f"[Suno Webhook] genre에서 첫 번째 값만 사용: 원본: {original_genre} → 저장: {genre}")
-            
-            # genre 필드는 max_length=50이므로 50자로 제한 (DB 오류 방지)
-            if genre and len(genre) > 50:
-                original_genre = genre
-                genre = genre[:50]
-                print(f"[Suno Webhook] 경고: genre가 50자를 초과하여 잘렸습니다. 원본: {original_genre[:100]}... → 저장: {genre}")
-            
-            # 빈 문자열 처리
-            audio_url = audio_url_raw.strip() if audio_url_raw and isinstance(audio_url_raw, str) else audio_url_raw
-            image_url = image_url_raw.strip() if image_url_raw and isinstance(image_url_raw, str) else image_url_raw
-            
-            # 빈 문자열이면 None으로 변환
-            if audio_url == '':
-                audio_url = None
-            if image_url == '':
-                image_url = None
-            
-            # callbackType에 따른 처리
-            # "text": 텍스트만 생성됨 (audio_url 없음) - DB 업데이트 없이 pending 반환
-            # "first": 첫 번째 오디오 생성됨 (audio_url 있음) - DB 업데이트
-            # "complete": 모든 오디오 생성 완료 (audio_url 있음) - DB 업데이트
-            
-            # callbackType이 "text"이고 audio_url이 없으면 생성 진행 중으로 처리
-            if callback_type == 'text' and not audio_url:
-                print(f"[Suno Webhook] callbackType='text', audio_url 없음 - 생성 진행 중 (DB 업데이트 없음)")
-                return Response({
-                    "status": "pending",
-                    "message": "음악 생성 진행 중...",
-                    "task_id": task_id,
-                    "callback_type": callback_type
-                }, status=status.HTTP_200_OK)
-            
-            # callbackType이 "text"이지만 audio_url이 있으면 업데이트 진행 (예외 케이스)
-            # callbackType이 "first" 또는 "complete"이면 업데이트 진행
-            
-            # 필수 필드가 없으면 경고 로그
-            if not audio_url:
-                print(f"[Suno Webhook] 경고: audio_url이 없습니다. taskId={task_id}, callbackType={callback_type}")
-            if not title:
-                print(f"[Suno Webhook] 경고: title이 없습니다. taskId={task_id}")
-            if not lyrics:
-                print(f"[Suno Webhook] 경고: lyrics가 없습니다. taskId={task_id}")
-            
-            # Music 업데이트 (callbackType이 "text"가 아니거나, "text"이지만 audio_url이 있는 경우)
-            now = timezone.now()
-            if title:
-                music.music_name = title
-            if audio_url:
-                music.audio_url = audio_url
-            if duration:
-                music.duration = duration
-            if lyrics:
-                music.lyrics = lyrics
-            if genre:
-                music.genre = genre
-            # valence, arousal은 null로 유지
-            music.updated_at = now
-            music.save()
-            
-            print(f"[Suno Webhook] 저장된 데이터:")
-            print(f"  - audio_url: {audio_url}")
-            print(f"  - audio_id: {audio_id}")
-            print(f"  - title: {title}")
-            print(f"  - duration: {duration}")
-            print(f"  - lyrics: {lyrics[:100] if lyrics else 'None'}...")
-            print(f"  - image_url: {image_url}")
-            print(f"  - genre: {genre}")
-            print(f"  - callback_type: {callback_type}")
-            
-            # 타임스탬프 가사 가져오기 (audio_url이 있고 instrumental이 아닌 경우)
-            if audio_url and task_id and callback_type in ['first', 'complete']:
-                try:
-                    print(f"[Suno Webhook] 타임스탬프 가사 조회 시작: taskId={task_id}, audioId={audio_id}")
-                    suno_service = SunoAPIService()
-                    timestamped_lyrics = suno_service.get_timestamped_lyrics(task_id, audio_id)
-                    if timestamped_lyrics:
-                        print(f"[Suno Webhook] 타임스탬프 가사 조회 성공, DB 업데이트 중...")
-                        music.lyrics = timestamped_lyrics
-                        music.updated_at = timezone.now()
-                        music.save()
-                        print(f"[Suno Webhook] 타임스탬프 가사 ✅ DB 업데이트 완료")
-                    else:
-                        print(f"[Suno Webhook] 타임스탬프 가사 조회 실패 또는 가사 없음 (일반 가사 유지)")
-                except Exception as e:
-                    print(f"[Suno Webhook] 타임스탬프 가사 조회 중 오류 발생 (일반 가사 유지): {e}")
-                    # 타임스탬프 가사 조회 실패는 치명적이지 않으므로 계속 진행
-            
-            # Artist 이미지 업데이트
-            if image_url:
-                artist = music.artist
-                if artist:
-                    artist.artist_image = image_url
-                    artist.updated_at = now
-                    artist.save()
-            
-            # Album 업데이트
-            album = music.album
-            if album:
-                album.album_name = f"AI Generated - {music.music_name}"
-                if image_url:
-                    album.album_image = image_url
-                album.updated_at = now
-                album.save()
-            
-            print(f"[Suno Webhook] music_id={music.music_id} 업데이트 완료")
-            
-            # 응답 반환 (callbackType과 audio_url 상태에 따라)
-            # "complete": 모든 오디오 생성 완료
-            if callback_type == 'complete' and audio_url:
-                return Response({
-                    "status": "success",
-                    "message": "음악 정보가 업데이트되었습니다.",
-                    "music_id": music.music_id,
-                    "music_name": music.music_name,
-                    "audio_url": music.audio_url,
-                    "callback_type": callback_type
-                }, status=status.HTTP_200_OK)
-            elif callback_type == 'complete' and not audio_url:
-                return Response({
-                    "status": "warning",
-                    "message": "음악 정보가 업데이트되었지만 audio_url이 없습니다.",
-                    "music_id": music.music_id,
-                    "music_name": music.music_name,
-                    "audio_url": None,
-                    "callback_type": callback_type
-                }, status=status.HTTP_200_OK)
-            # "first": 첫 번째 오디오 생성됨
-            elif callback_type == 'first' and audio_url:
-                return Response({
-                    "status": "success",
-                    "message": "첫 번째 오디오가 생성되었습니다.",
-                    "music_id": music.music_id,
-                    "music_name": music.music_name,
-                    "audio_url": music.audio_url,
-                    "callback_type": callback_type
-                }, status=status.HTTP_200_OK)
-            elif callback_type == 'first' and not audio_url:
-                return Response({
-                    "status": "warning",
-                    "message": "음악 정보가 업데이트되었지만 audio_url이 없습니다.",
-                    "music_id": music.music_id,
-                    "music_name": music.music_name,
-                    "audio_url": None,
-                    "callback_type": callback_type
-                }, status=status.HTTP_200_OK)
-            # "text": 텍스트만 생성됨 (하지만 audio_url이 있는 예외 케이스)
-            elif callback_type == 'text':
-                return Response({
-                    "status": "success",
-                    "message": "음악 정보가 업데이트되었습니다.",
-                    "music_id": music.music_id,
-                    "music_name": music.music_name,
-                    "audio_url": music.audio_url,
-                    "callback_type": callback_type
-                }, status=status.HTTP_200_OK)
-            # 기타 경우
-            else:
-                return Response({
-                    "status": "success",
-                    "message": "음악 정보가 업데이트되었습니다.",
-                    "music_id": music.music_id,
-                    "music_name": music.music_name,
-                    "audio_url": music.audio_url,
-                    "callback_type": callback_type
-                }, status=status.HTTP_200_OK)
-            
+            process_suno_webhook_task.delay(data)
+            print(f"[Suno Webhook] ✅ Celery 큐에 추가 완료 - 즉시 200 OK 반환")
         except Exception as e:
-            print(f"[Suno Webhook] DB 업데이트 오류: {e}")
-            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            print(f"[Suno Webhook] ⚠️ Celery 큐 추가 실패 (계속 진행): {e}")
+        
+        # 즉시 200 OK 반환 (1초 이내)
+        return Response({
+            "status": "accepted",
+            "message": "Webhook 수신 완료. 백그라운드에서 처리 중입니다.",
+            "task_id": task_id
+        }, status=status.HTTP_200_OK)
         
     except Exception as e:
         print(f"[Suno Webhook] 처리 중 오류: {e}")
-        return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        import traceback
+        traceback.print_exc()
+        # 에러가 발생해도 200 OK 반환 (Suno가 재시도하지 않도록, ngrok에서 200 OK 확인 가능)
+        return Response({
+            "status": "error",
+            "message": "Webhook 처리 중 오류가 발생했습니다. 로그를 확인하세요.",
+            "error": str(e)
+        }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

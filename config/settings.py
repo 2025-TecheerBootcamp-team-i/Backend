@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'corsheaders', # CORS 설정 (프론트엔드와 통신)
     'drf_spectacular', # Swagger/OpenAPI 문서 자동 생성
     'django_celery_results', # Celery 작업 결과를 DB에 저장하기 위해 추가
+    'storages', # Django 파일 스토리지 백엔드 (S3 연동)
     # Local apps
     'music', # 우리가 만든 'music' 앱 추가
 ]
@@ -256,3 +257,28 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
     'SCHEMA_PATH_PREFIX': '/api/v1/',
 }
+
+# ==============================================
+# AWS S3 파일 스토리지 설정
+# ==============================================
+# AWS S3를 기본 파일 스토리지로 사용 (버킷 이름이 설정된 경우)
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
+AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', '')
+AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'ap-northeast-2')
+AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN', f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com')
+
+# S3 버킷이 설정된 경우에만 S3를 기본 스토리지로 사용
+if AWS_STORAGE_BUCKET_NAME:
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
+    
+    # S3 설정
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',  # 1일 캐시
+    }
+    AWS_DEFAULT_ACL = 'public-read'  # 퍼블릭 읽기 허용
+    AWS_QUERYSTRING_AUTH = False  # URL에 서명 불필요 (퍼블릭 파일)
+else:
+    # S3 버킷이 설정되지 않은 경우 로컬 스토리지 사용
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'

@@ -16,6 +16,7 @@ psycopg2-binary                     # PostgreSQL 데이터베이스 어댑터
 # ==============================================
 celery                              # 비동기 작업 큐 (AI 음악 생성 등)
 django-celery-results               # Celery 작업 결과를 Django DB에 저장
+flower                              # Celery 모니터링 웹 UI (작업 큐, 워커 상태 확인)
 
 # ==============================================
 # 파일 스토리지 (AWS S3)

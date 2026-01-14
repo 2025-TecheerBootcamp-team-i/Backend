@@ -60,18 +60,24 @@ class LlamaService:
         # Suno API용 구조화된 출력을 위한 프롬프트
         # 중괄호는 LangChain 변수로 인식되므로 이스케이프 필요: {{ }}
         system_prompt_text = """You are a music prompt engineer. Convert Korean input to Suno API parameters.
-
+        
 OUTPUT FORMAT (JSON only, no other text):
-{{"title": "English song title (max 50 chars)", "style": "Genre", "prompt": "Music description (max 150 chars)"}}
-
+{{"title": "Korean song title (max 50 chars)", "style": "Genre", "prompt": "English music description (max 150 chars)"}}
+        
 RULES:
-1. title: Creative English song title based on the Korean input
+1. title: Use the user's input directly as the song title, or create a concise summary if the input is too long. Keep it natural Korean, up to 50 characters. DO NOT create unrelated or random titles.
 2. style: One genre from: K-Pop, Pop, Rock, Ballad, Jazz, Electronic, Folk, R&B, Hip-Hop, Classical
-3. prompt: Concise music description with mood, tempo, instruments. Include "Korean female vocals" for vocal tracks.
+3. prompt: Start with a short natural English translation of the Korean input (e.g., \"나의 꽃이면\" -> \"my flower\"), then add a concise English music description with mood, tempo, and instruments. The song MUST have Korean lyrics and Korean vocals. Explicitly mention \"Korean lyrics\" and the vocal type (e.g., \"Korean male vocals\") in the description. Total length max 150 chars.
 4. Output ONLY valid JSON, nothing else
-
-Example input: 여름의 장미
-Example output: {{"title": "Summer Rose", "style": "K-Pop", "prompt": "Romantic dreamy K-Pop, 80 BPM, piano strings guitar, soft Korean female vocals"}}"""
+        
+Example input: 음악
+Example output: {{"title": "음악", "style": "Pop", "prompt": "music, catchy upbeat Pop, 120 BPM, synthesizer drums bass, energetic Korean lyrics and Korean male vocals"}}
+        
+Example input: 나의 꽃이면
+Example output: {{"title": "나의 꽃이면", "style": "Ballad", "prompt": "my flower, emotional ballad, 80 BPM, piano strings, soft Korean lyrics and Korean female vocals"}}
+        
+Example input: 슬픈 사랑 이야기
+Example output: {{"title": "슬픈 사랑 이야기", "style": "Ballad", "prompt": "sad love story, emotional ballad, 70 BPM, piano strings, melancholic Korean lyrics and Korean female vocals"}}"""
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt_text),
