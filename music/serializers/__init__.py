@@ -15,6 +15,7 @@ from .base import (
 from .music import (
     MusicDetailSerializer,
     MusicLikeSerializer,
+    MusicPlaySerializer,
 )
 
 # 검색 관련 Serializers
@@ -38,6 +39,7 @@ __all__ = [
     # music
     'MusicDetailSerializer',
     'MusicLikeSerializer',
+    'MusicPlaySerializer',
     # search
     'iTunesSearchResultSerializer',
     # auth

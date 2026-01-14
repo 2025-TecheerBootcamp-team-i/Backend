@@ -19,7 +19,7 @@ from .likes import MusicLikeView
 from .search import MusicSearchView
 
 # 음악 상세 관련 Views
-from .music import MusicDetailView
+from .music import MusicDetailView, MusicPlayView
 
 # 레거시 함수 기반 Views (웹 페이지 및 음악 생성)
 from .legacy import (
@@ -48,6 +48,7 @@ __all__ = [
     'MusicSearchView',
     # music
     'MusicDetailView',
+    'MusicPlayView',
     # legacy (함수 기반)
     'music_generator_page',
     'music_list_page',

@@ -49,3 +49,18 @@ class MusicLikeSerializer(serializers.Serializer):
     message = serializers.CharField()
     music_id = serializers.IntegerField()
     is_liked = serializers.BooleanField()
+
+
+class MusicPlaySerializer(serializers.ModelSerializer):
+    """음악 재생용 Serializer (재생에 필요한 정보만)"""
+    artist_name = serializers.CharField(source='artist.artist_name', read_only=True)
+    album_name = serializers.CharField(source='album.album_name', read_only=True)
+    album_image = serializers.CharField(source='album.album_image', read_only=True)
+    
+    class Meta:
+        model = Music
+        fields = [
+            'music_id', 'music_name', 'artist_name', 'album_name', 
+            'album_image', 'audio_url', 'duration', 'genre', 
+            'is_ai', 'lyrics', 'itunes_id'
+        ]

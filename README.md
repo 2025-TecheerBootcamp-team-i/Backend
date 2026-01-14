@@ -319,6 +319,15 @@ curl http://localhost:8000/api/music/?user_id=1
 curl http://localhost:8000/api/music/123/
 ```
 
+#### 5. 음악 재생
+
+음악 재생 전용 API로, 재생에 필요한 정보를 반환하고 재생 로그를 자동으로 기록합니다.
+
+```bash
+# 음악 ID 1916번 재생
+curl http://localhost:8000/api/v1/tracks/1916/play
+```
+
 ### API 엔드포인트 목록
 
 | Method | Endpoint | 설명 |
@@ -328,6 +337,7 @@ curl http://localhost:8000/api/music/123/
 | GET | `/api/music/task/{task_id}/` | 작업 상태 조회 |
 | GET | `/api/music/` | 음악 목록 조회 |
 | GET | `/api/music/{music_id}/` | 음악 상세 조회 |
+| GET | `/api/v1/tracks/{music_id}/play` | 음악 재생 (audio_url 반환 + 재생 로그 기록) |
 
 ### 주의사항
 
