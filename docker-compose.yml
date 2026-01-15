@@ -1,0 +1,88 @@
+services:
+  # Django 웹 애플리케이션 서비스
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000 # 개발 서버 실행 명령어
+    volumes:
+      - ./:/usr/src/app/ # 현재 디렉토리를 컨테이너의 /usr/src/app에 마운트
+    ports:
+      - 8000:8000 # 호스트의 8000번 포트를 컨테이너의 8000번 포트에 연결
+    env_file:
+      - ./.env # .env 파일에서 환경 변수 로드
+    depends_on:
+      db:
+        condition: service_healthy # DB가 healthy 상태일 때만 시작
+      rabbitmq:
+        condition: service_started # RabbitMQ가 시작되면 시작
+
+  # PostgreSQL 데이터베이스 서비스
+  db:
+    image: postgres:18 # PostgreSQL 18 이미지 사용
+    ports:
+      - "5433:5432"  # 외부포트:5433, 내부포트:5432 (로컬 PostgreSQL과 충돌 방지)
+    volumes:
+      - postgres_data:/var/lib/postgresql # PostgreSQL 18+는 /var/lib/postgresql에 마운트
+    environment:
+      - POSTGRES_USER=music_user # DB 사용자 이름
+      - POSTGRES_PASSWORD=music_password # DB 사용자 비밀번호
+      - POSTGRES_DB=music_db # DB 이름
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U music_user -d music_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ 메시지 브로커 서비스 (Celery용)
+  rabbitmq:
+    image: rabbitmq:3-management # 관리 UI가 포함된 RabbitMQ 이미지 사용
+    ports:
+      - 5672:5672 # AMQP 포트
+      - 15672:15672 # 관리 UI 포트 (http://localhost:15672)
+
+  # Celery 워커 서비스 (비동기 작업 처리)
+  celery:
+    build: .
+    command: celery -A config worker -l info # Celery 워커 실행 명령어
+    volumes:
+      - ./:/usr/src/app/ # 현재 디렉토리를 컨테이너의 /usr/src/app에 마운트
+    env_file:
+      - ./.env # .env 파일에서 환경 변수 로드
+    depends_on:
+      db:
+        condition: service_healthy # DB가 healthy 상태일 때만 시작
+      rabbitmq:
+        condition: service_started # RabbitMQ가 시작되면 시작
+
+  # Flower 서비스 (Celery 모니터링 웹 UI)
+  flower:
+    build: .
+    command: celery -A config flower --port=5555 # Flower 웹 UI 실행
+    ports:
+      - "5555:5555" # Flower 웹 UI 포트 (http://localhost:5555)
+    volumes:
+      - ./:/usr/src/app/ # 현재 디렉토리를 컨테이너의 /usr/src/app에 마운트
+    env_file:
+      - ./.env # .env 파일에서 환경 변수 로드
+    depends_on:
+      rabbitmq:
+        condition: service_started # RabbitMQ가 시작되면 시작
+      celery:
+        condition: service_started # Celery 워커가 시작되면 시작
+
+  # Ngrok 터널 서비스 (웹훅 콜백용, 선택적)
+  ngrok:
+    image: ngrok/ngrok:latest
+    command:
+      - http
+      - web:8000
+      - --log=stdout
+    ports:
+      - "4040:4040"  # ngrok 웹 UI 포트
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  postgres_data: # PostgreSQL 데이터 저장을 위한 명명된 볼륨

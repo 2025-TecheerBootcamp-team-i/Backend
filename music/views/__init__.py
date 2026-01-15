@@ -1,0 +1,63 @@
+"""
+Music 앱의 Views 패키지
+모든 View를 한 곳에서 import 할 수 있도록 export
+"""
+
+# 공통 유틸리티
+from .common import MusicPagination
+
+# 인증 관련 Views
+from .auth import (
+    RegisterView,
+    LoginView,
+)
+
+# 좋아요 관련 Views
+from .likes import MusicLikeView
+
+# 검색 관련 Views
+from .search import MusicSearchView
+
+# 음악 상세 관련 Views
+from .music import MusicDetailView, MusicPlayView
+
+# 레거시 함수 기반 Views (웹 페이지 및 음악 생성)
+from .legacy import (
+    music_generator_page,
+    music_list_page,
+    music_monitor_page,
+    generate_music,
+    generate_music_async,
+    suno_webhook,
+    get_task_status,
+    get_suno_task_status,
+    list_music,
+    get_music_detail,
+)
+
+# 외부에서 사용 가능한 모든 클래스 및 함수
+__all__ = [
+    # common
+    'MusicPagination',
+    # auth
+    'RegisterView',
+    'LoginView',
+    # likes
+    'MusicLikeView',
+    # search
+    'MusicSearchView',
+    # music
+    'MusicDetailView',
+    'MusicPlayView',
+    # legacy (함수 기반)
+    'music_generator_page',
+    'music_list_page',
+    'music_monitor_page',
+    'generate_music',
+    'generate_music_async',
+    'suno_webhook',
+    'get_task_status',
+    'get_suno_task_status',
+    'list_music',
+    'get_music_detail',
+]

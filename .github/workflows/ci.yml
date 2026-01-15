@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  detect-pr:
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pr.outputs.pr_number }}
+    steps:
+      - name: Find PR
+        id: pr
+        run: |
+          PR_NUMBER=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --state closed \
+            --json number,mergeCommit \
+            --jq ".[] | select(.mergeCommit.oid == \"${{ github.sha }}\") | .number")
+          
+          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: detect-pr
+    # detect-pr에서 PR 번호를 찾았을 때만 실행
+    if: needs.detect-pr.outputs.pr_number != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # [최적화] API를 다시 호출하지 않고, 위에서 넘겨받은 값을 바로 사용하여 태그 생성
+      - name: Set Docker Image Tag
+        id: set_tag
+        run: |
+          PR_NUMBER="${{ needs.detect-pr.outputs.pr_number }}"
+          DOCKER_IMAGE_TAG="1.0.${PR_NUMBER}"
+          echo "DOCKER_IMAGE_TAG=${DOCKER_IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+
+      - name: Build Docker Image
+        env:
+          DOCKER_IMAGE_TAG: ${{ steps.set_tag.outputs.DOCKER_IMAGE_TAG }} 
+        run: |
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:${{ env.DOCKER_IMAGE_TAG }} .
+
+      - name: Push Docker Image
+        env:
+          DOCKER_IMAGE_TAG: ${{ steps.set_tag.outputs.DOCKER_IMAGE_TAG }} 
+        run: |
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:${{ env.DOCKER_IMAGE_TAG }}
