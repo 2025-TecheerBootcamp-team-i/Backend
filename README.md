@@ -17,6 +17,7 @@
 - **Database**: PostgreSQL
 - **Message Broker**: RabbitMQ
 - **AI**: LangChain + Llama (via Tailscale), Suno API
+- **Monitoring**: Prometheus, Grafana, Loki, Promtail
 - **DevOps & Infra**: Docker, Docker Compose
 - **Workflow**: GitHub, Notion, Slack, Figma
 
@@ -67,6 +68,10 @@
    - 데이터베이스 (PostgreSQL): `localhost:5433`
    - 메시지 브로커 (RabbitMQ): `localhost:5672`, 관리 UI: `http://localhost:15672`
    - Celery 워커 (비동기 작업 처리)
+   - Flower (Celery 모니터링): `http://localhost:5555`
+   - Prometheus (메트릭 수집): `http://localhost:9090`
+   - Grafana (대시보드): `http://localhost:3000` (admin/admin123)
+   - Loki (로그 수집): `http://localhost:3100`
    - ngrok (선택적): `http://localhost:4040`
 
 4.  **데이터베이스 마이그레이션**
@@ -85,6 +90,9 @@
     - **웹 애플리케이션**: `http://localhost:8000`
     - **Django 관리자 페이지**: `http://localhost:8000/admin`
     - **RabbitMQ 관리 페이지**: `http://localhost:15672` (ID: `guest`, PW: `guest`)
+    - **Grafana 대시보드**: `http://localhost:3000` (ID: `admin`, PW: `admin123`)
+    - **Prometheus**: `http://localhost:9090`
+    - **Flower (Celery 모니터링)**: `http://localhost:5555`
 
 ---
 
@@ -360,7 +368,103 @@ curl http://localhost:8000/api/v1/tracks/1916/play
 
 ---
 
-## 5. 🤝 협업 가이드
+## 5. 📊 모니터링 시스템
+
+프로젝트에는 Prometheus, Grafana, Loki를 활용한 통합 모니터링 시스템이 구축되어 있습니다.
+
+### 모니터링 스택
+
+- **Prometheus**: 메트릭 수집 및 저장
+- **Grafana**: 대시보드 시각화
+- **Loki**: 로그 수집 및 저장
+- **Promtail**: 로그 수집 에이전트
+
+### 접속 정보
+
+| 서비스 | URL | 인증 정보 |
+|--------|-----|----------|
+| Grafana | http://localhost:3000 | admin / admin123 |
+| Prometheus | http://localhost:9090 | - |
+| Loki | http://localhost:3100 | - |
+
+### Grafana 대시보드
+
+다음 3개의 대시보드가 자동으로 로드됩니다:
+
+1. **Django Application Metrics**
+   - HTTP 요청/응답 메트릭
+   - 에러율 모니터링
+   - DB 쿼리 성능
+   - HTTP 레이턴시 (p95, p50)
+   - 캐시 작업 모니터링
+
+2. **System Overview**
+   - 전체 시스템 요약
+   - 서비스 헬스 체크
+   - RabbitMQ 연결 상태
+   - 큐 메시지 현황
+
+3. **RabbitMQ Metrics**
+   - 큐 메시지 상태 (Ready, Unacked)
+   - 메시지 처리율 (Published, Delivered)
+   - 연결 및 채널 수
+   - 메모리 사용량
+
+### 수집되는 메트릭
+
+**Django 메트릭:**
+- HTTP 요청 수 (메서드별)
+- HTTP 응답 상태 코드
+- HTTP 레이턴시 (히스토그램)
+- DB 쿼리 수 및 실행 시간
+- 에러율 (5xx 응답 비율)
+
+**RabbitMQ 메트릭:**
+- 연결 수 및 채널 수
+- 큐 메시지 수 (Ready, Unacked)
+- 메시지 처리율 (Published, Delivered)
+- 메모리 사용량
+
+### 테스트 엔드포인트
+
+모니터링 시스템을 테스트하기 위한 엔드포인트가 제공됩니다:
+
+**에러율 테스트:**
+```bash
+# 100% 확률로 500 에러 발생
+curl http://localhost:8000/api/v1/test/error?code=500
+
+# 50% 확률로 503 에러 발생
+curl http://localhost:8000/api/v1/test/error?code=503&rate=0.5
+```
+
+**DB 쿼리 테스트:**
+```bash
+# 다양한 DB 쿼리 실행 (10개)
+curl http://localhost:8000/api/v1/test/db?count=10
+
+# SELECT 쿼리만 실행
+curl http://localhost:8000/api/v1/test/db?count=20&type=select
+```
+
+### 환경 변수 설정
+
+DB 쿼리 메트릭 수집을 위해 `.env` 파일에 다음 설정이 필요합니다:
+
+```bash
+# django-prometheus를 사용하여 DB 메트릭 수집
+SQL_ENGINE=django_prometheus.db.backends.postgresql
+```
+
+### 주의사항
+
+- Grafana 대시보드는 컨테이너 시작 후 자동으로 로드됩니다
+- Prometheus는 15초마다 메트릭을 수집합니다
+- Loki는 Docker 컨테이너 로그를 자동으로 수집합니다
+
+---
+
+## 6. 🤝 협업 가이드
 
 원활한 협업을 위해 다음 규칙을 준수해 주세요.
 
