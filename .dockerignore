@@ -1,0 +1,168 @@
+# ==============================================
+# .dockerignore
+# Docker 빌드 시 컨텍스트에서 제외할 파일/디렉토리
+# ==============================================
+
+# ==============================================
+# Python 관련 파일
+# ==============================================
+# Python 바이트코드 캐시 (불필요, 컨테이너 내에서 재생성됨)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Python 배포/빌드 파일
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 가상 환경 (호스트 환경, 컨테이너와 무관)
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv
+
+# ==============================================
+# Django 관련 파일
+# ==============================================
+# 로컬 개발 데이터베이스 (컨테이너는 PostgreSQL 사용)
+db.sqlite3
+db.sqlite3-journal
+
+# 정적 파일 빌드 결과 (컨테이너 내에서 collectstatic 실행)
+/static_root/
+/staticfiles/
+
+# 미디어 파일 (S3 사용, 로컬 업로드 파일 제외)
+/media_root/
+
+# Django 로그 파일 (컨테이너 내에서 새로 생성)
+*.log
+
+# ==============================================
+# 버전 관리 시스템
+# ==============================================
+# Git 디렉토리 (빌드와 무관, 용량 큼)
+.git/
+.gitignore
+.gitattributes
+
+# ==============================================
+# IDE 및 에디터 설정
+# ==============================================
+# VSCode
+.vscode/
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# ==============================================
+# Docker 관련 파일
+# ==============================================
+# Docker 설정 파일 (이미 빌드 명령어로 사용됨)
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+
+# ==============================================
+# 테스트 및 커버리지
+# ==============================================
+# Pytest 캐시
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+.hypothesis/
+
+# ==============================================
+# 환경 변수 파일
+# ==============================================
+# 민감한 정보 포함 (이미지에 포함되면 안 됨)
+.env
+.env.local
+.env.*.local
+*.env
+
+# ==============================================
+# 문서 및 README
+# ==============================================
+# 마크다운 파일 (빌드와 무관)
+*.md
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+LICENSE
+
+# ==============================================
+# CI/CD 설정
+# ==============================================
+# GitHub Actions
+.github/
+
+# ==============================================
+# 모니터링 데이터
+# ==============================================
+# Prometheus, Grafana, Loki 데이터만 제외 (설정 파일은 포함)
+# RabbitMQ 설정 파일은 필요하므로 제외하지 않음
+monitoring/prometheus/data/
+monitoring/grafana/data/
+monitoring/loki/data/
+
+# ==============================================
+# 기타
+# ==============================================
+# 임시 파일
+*.tmp
+*.temp
+tmp/
+temp/
+
+# 백업 파일
+*.bak
+*.backup
+
+# Node.js (프론트엔드 관련, 백엔드에선 불필요)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# 쉘 스크립트 (로컬 개발용)
+*.sh
+
+# 설정 파일 (일부)
+infra.yml
