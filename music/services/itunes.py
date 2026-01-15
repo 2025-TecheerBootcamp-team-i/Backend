@@ -79,7 +79,15 @@ class iTunesService:
             data = response.json()
             
             if data.get('resultCount', 0) > 0:
-                return data['results'][0]
+                # 앨범 ID로 조회한 경우 첫 번째가 앨범 정보일 수 있으므로
+                # wrapperType이 "track"인 첫 번째 곡 정보를 찾음
+                results = data.get('results', [])
+                for result in results:
+                    if result.get('wrapperType') == 'track' or result.get('kind') == 'song':
+                        return result
+                
+                # 트랙을 찾지 못하면 첫 번째 결과 반환 (기존 동작 유지)
+                return results[0] if results else None
             
             return None
             
