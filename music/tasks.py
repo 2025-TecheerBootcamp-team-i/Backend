@@ -12,6 +12,25 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+@shared_task(bind=True)
+def test_task(self, message: str = "테스트 메시지", delay_seconds: int = 1):
+    """
+    RabbitMQ 메트릭 테스트용 간단한 작업
+    
+    Args:
+        message: 출력할 메시지
+        delay_seconds: 대기 시간 (초)
+    
+    Returns:
+        작업 완료 메시지
+    """
+    import time
+    logger.info(f"테스트 작업 시작: {message}")
+    time.sleep(delay_seconds)  # 지정된 시간만큼 대기
+    logger.info(f"테스트 작업 완료: {message}")
+    return {"status": "success", "message": message, "task_id": self.request.id}
+
+
 @shared_task(bind=True, max_retries=3)
 def generate_music_task(self, user_prompt: str, user_id: int = None, make_instrumental: bool = False):
     """
@@ -401,11 +420,14 @@ def process_suno_webhook_task(self, webhook_data: dict):
         # Music 업데이트
         now = timezone.now()
         
-        # 제목: Suno가 제공한 제목을 최종으로 사용
-        # generate_music 단계에서 임시로 저장된 제목이 있어도 Suno 제목으로 덮어쓴다.
-        if title:
+        # 제목: Llama가 생성한 제목을 유지 (Suno 제목으로 덮어쓰지 않음)
+        # generate_music 단계에서 이미 Llama 제목이 저장되어 있으므로 webhook에서는 유지
+        if not music.music_name and title:
+            # music_name이 비어 있을 때만 Suno 제목을 fallback으로 사용
             music.music_name = title
-            logger.info(f"[Webhook 태스크] 제목 업데이트 (Suno 최종): {title}")
+            logger.info(f"[Webhook 태스크] 제목 fallback (Llama 제목 없음): {title}")
+        else:
+            logger.info(f"[Webhook 태스크] 제목 유지 (Llama 제목 사용): {music.music_name}")
         
         # audio_url: S3 URL이 아닐 때만 업데이트
         if audio_url and not is_s3_url(music.audio_url):
