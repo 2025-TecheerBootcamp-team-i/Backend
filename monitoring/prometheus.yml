@@ -1,0 +1,47 @@
+# Prometheus 설정 파일
+# Django 백엔드 및 인프라 메트릭 수집
+
+global:
+  scrape_interval: 15s      # 메트릭 수집 주기 (15초마다)
+  evaluation_interval: 15s  # 룰 평가 주기
+  external_labels:
+    monitor: 'music-backend'  # 외부 시스템 연동 시 라벨
+
+# 스크래핑 대상 설정
+scrape_configs:
+  # Prometheus 자체 메트릭
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # Django 애플리케이션 메트릭 (django-prometheus 필요)
+  - job_name: 'django'
+    metrics_path: /metrics  # django-prometheus가 노출하는 엔드포인트
+    static_configs:
+      - targets: ['web:8000']
+        labels:
+          service: 'django'
+          app: 'music-backend'
+
+  # RabbitMQ 메트릭 (rabbitmq_exporter 플러그인 활성화 필요)
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']  # RabbitMQ Prometheus 플러그인 포트
+        labels:
+          service: 'rabbitmq'
+
+  # Celery Flower 메트릭
+  - job_name: 'flower'
+    static_configs:
+      - targets: ['flower:5555']
+        labels:
+          service: 'celery-flower'
+
+  # Loki 메트릭 (로그 시스템 상태)
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+        labels:
+          service: 'loki'

@@ -42,11 +42,13 @@ INSTALLED_APPS = [
     'drf_spectacular', # Swagger/OpenAPI 문서 자동 생성
     'django_celery_results', # Celery 작업 결과를 DB에 저장하기 위해 추가
     'storages', # Django 파일 스토리지 백엔드 (S3 연동)
+    'django_prometheus', # Prometheus 메트릭 노출 (모니터링)
     # Local apps
     'music', # 우리가 만든 'music' 앱 추가
 ]
 
 MIDDLEWARE = [
+    'django_prometheus.middleware.PrometheusBeforeMiddleware',  # Prometheus (맨 처음)
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # CORS 미들웨어 (최상단 근처에 위치)
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -55,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_prometheus.middleware.PrometheusAfterMiddleware',  # Prometheus (맨 마지막)
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -83,7 +86,8 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': os.getenv('SQL_ENGINE', 'django.db.backends.postgresql'),
+        # django-prometheus를 사용하여 DB 쿼리 메트릭 수집
+        'ENGINE': os.getenv('SQL_ENGINE', 'django_prometheus.db.backends.postgresql'),
         'NAME': os.getenv('SQL_DATABASE', 'music_db'),
         'USER': os.getenv('SQL_USER', 'music_user'),
         'PASSWORD': os.getenv('SQL_PASSWORD', 'music_password'),

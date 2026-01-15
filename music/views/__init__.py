@@ -4,7 +4,7 @@ Music 앱의 Views 패키지
 """
 
 # 공통 유틸리티
-from .common import MusicPagination
+from .common import MusicPagination, ErrorTestView, DatabaseQueryTestView
 
 # 인증 관련 Views
 from .auth import (
@@ -20,6 +20,9 @@ from .search import MusicSearchView
 
 # 음악 상세 관련 Views
 from .music import MusicDetailView, MusicPlayView
+
+# 아티스트 관련 Views
+from .artists import ArtistDetailView, ArtistTracksView, ArtistAlbumsView
 
 # 레거시 함수 기반 Views (웹 페이지 및 음악 생성)
 from .legacy import (
@@ -39,6 +42,8 @@ from .legacy import (
 __all__ = [
     # common
     'MusicPagination',
+    'ErrorTestView',
+    'DatabaseQueryTestView',
     # auth
     'RegisterView',
     'LoginView',
@@ -49,6 +54,10 @@ __all__ = [
     # music
     'MusicDetailView',
     'MusicPlayView',
+    # artists
+    'ArtistDetailView',
+    'ArtistTracksView',
+    'ArtistAlbumsView',
     # legacy (함수 기반)
     'music_generator_page',
     'music_list_page',

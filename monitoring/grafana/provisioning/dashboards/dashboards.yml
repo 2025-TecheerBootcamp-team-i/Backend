@@ -1,0 +1,16 @@
+# Grafana 대시보드 자동 프로비저닝 설정
+# 이 폴더의 JSON 파일들이 자동으로 대시보드로 등록됩니다
+
+apiVersion: 1
+
+providers:
+  - name: 'Music Backend Dashboards'
+    orgId: 1
+    folder: ''  # 루트 폴더에 배치
+    type: file
+    disableDeletion: false  # 대시보드 삭제 허용
+    updateIntervalSeconds: 10  # 10초마다 새로고침
+    allowUiUpdates: true  # UI에서 수정 허용
+    options:
+      # 컨테이너 내부 대시보드 JSON 경로 (docker-compose에서 /var/lib/grafana/dashboards로 마운트 예정)
+      path: /var/lib/grafana/dashboards

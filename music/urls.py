@@ -5,12 +5,17 @@ from django.urls import path
 from . import views
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
-    RegisterView, 
-    LoginView, 
+    RegisterView,
+    LoginView,
     MusicLikeView,
     MusicSearchView,
     MusicDetailView,
-    MusicPlayView
+    MusicPlayView,
+    ArtistDetailView,
+    ArtistTracksView,
+    ArtistAlbumsView,
+    ErrorTestView,
+    DatabaseQueryTestView,
 )
 
 app_name = 'music'
@@ -24,6 +29,12 @@ urlpatterns = [
     path('auth/tokens/', LoginView.as_view(), name='login'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
+    # 테스트용 엔드포인트
+    # GET /api/v1/test/error?code=500&rate=0.5  # 에러율 테스트
+    path('test/error', ErrorTestView.as_view(), name='error-test'),
+    # GET /api/v1/test/db?count=10  # Database Queries 테스트
+    path('test/db', DatabaseQueryTestView.as_view(), name='db-test'),
+    
     # iTunes 기반 검색 (새로운 메인 검색)
     # GET /api/v1/search?q={검색어}&exclude_ai={true|false}
     path('search', MusicSearchView.as_view(), name='itunes-search'),
@@ -35,6 +46,18 @@ urlpatterns = [
     # 음악 재생 (audio_url 반환 및 재생 로그 기록)
     # GET /api/v1/tracks/{music_id}/play
     path('tracks/<int:music_id>/play', MusicPlayView.as_view(), name='music-play'),
+
+    # 아티스트 단일 조회
+    # GET /api/v1/artists/{artist_id}/
+    path('artists/<int:artist_id>/', ArtistDetailView.as_view(), name='artist-detail'),
+    
+    # 아티스트별 곡 목록 조회
+    # GET /api/v1/artists/{artist_id}/tracks/
+    path('artists/<int:artist_id>/tracks/', ArtistTracksView.as_view(), name='artist-tracks'),
+    
+    # 아티스트별 앨범 목록 조회
+    # GET /api/v1/artists/{artist_id}/albums/
+    path('artists/<int:artist_id>/albums/', ArtistAlbumsView.as_view(), name='artist-albums'),
     
     # 좋아요 등록/취소
     # POST /api/v1/tracks/{music_id}/likes

@@ -1,0 +1,206 @@
+{
+  "title": "System Overview",
+  "tags": ["overview", "system", "infrastructure"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP Requests (Total)",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "sum(rate(django_http_requests_total_by_method_total[5m])) or vector(0)",
+          "legendFormat": "Requests/sec",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "unit": "reqps"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Error Rate",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "expr": "(sum(rate(django_http_responses_total_by_status_total{status=~'5..'}[5m])) or vector(0)) / clamp_min(sum(rate(django_http_responses_total_by_status_total[5m])), 1) * 100",
+          "legendFormat": "Error Rate",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "unit": "percent",
+        "decimals": 2
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 1, "color": "yellow"},
+              {"value": 5, "color": "red"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Queue Messages (Ready)",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "sum(rabbitmq_queue_messages_ready) or vector(0)",
+          "legendFormat": "Messages",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "unit": "short"
+      }
+    },
+    {
+      "id": 4,
+      "title": "RabbitMQ Connections",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "expr": "rabbitmq_connections or vector(0)",
+          "legendFormat": "Connections",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "unit": "short"
+      }
+    },
+    {
+      "id": 5,
+      "title": "HTTP Request Rate",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {
+          "expr": "sum(rate(django_http_requests_total_by_method_total[5m])) by (method) or vector(0)",
+          "legendFormat": "{{method}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {"format": "reqps", "label": "Requests/sec"},
+        {"format": "short"}
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Queue Messages",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {
+          "expr": "rabbitmq_queue_messages_ready or vector(0)",
+          "legendFormat": "Ready",
+          "refId": "A"
+        },
+        {
+          "expr": "rabbitmq_queue_messages_unacked or vector(0)",
+          "legendFormat": "Unacked",
+          "refId": "B"
+        }
+      ],
+      "yaxes": [
+        {"format": "short", "label": "Messages"},
+        {"format": "short"}
+      ]
+    },
+    {
+      "id": 7,
+      "title": "HTTP Response Time (p95)",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(django_http_requests_latency_including_middlewares_seconds_bucket[5m])) by (le)) or vector(0)",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(django_http_requests_latency_including_middlewares_seconds_bucket[5m])) by (le)) or vector(0)",
+          "legendFormat": "p50",
+          "refId": "B"
+        }
+      ],
+      "yaxes": [
+        {"format": "s", "label": "Latency"},
+        {"format": "short"}
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Message Processing Rate",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "targets": [
+        {
+          "expr": "sum(rate(rabbitmq_global_messages_delivered_total[5m])) or vector(0)",
+          "legendFormat": "Delivered",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(rabbitmq_queue_messages_published_total[5m])) or vector(0)",
+          "legendFormat": "Published",
+          "refId": "B"
+        }
+      ],
+      "yaxes": [
+        {"format": "ops", "label": "Messages/sec"},
+        {"format": "short"}
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Service Health",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
+      "targets": [
+        {
+          "expr": "up",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "job": "Service",
+              "instance": "Endpoint",
+              "Value": "Status"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m", "1h"]
+  }
+}
