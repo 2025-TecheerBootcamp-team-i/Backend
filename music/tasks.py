@@ -1,12 +1,14 @@
 """
 Celery 비동기 작업 정의
 """
+import time
 from celery import shared_task
 from django.utils import timezone
 from .models import Music, AiInfo, Users, Artists, Albums
 from .music_generate.services import LlamaService, SunoAPIService
 from .music_generate.utils import extract_genre_from_prompt
 from .utils.s3_upload import download_and_upload_to_s3, is_suno_url, is_s3_url
+from .services import WikidataService, LRCLIBService, DeezerService, LyricsOvhService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,11 +26,146 @@ def test_task(self, message: str = "테스트 메시지", delay_seconds: int = 1
     Returns:
         작업 완료 메시지
     """
-    import time
     logger.info(f"테스트 작업 시작: {message}")
     time.sleep(delay_seconds)  # 지정된 시간만큼 대기
     logger.info(f"테스트 작업 완료: {message}")
     return {"status": "success", "message": message, "task_id": self.request.id}
+
+
+@shared_task(bind=True, max_retries=2)
+def fetch_artist_image_task(self, artist_id: int, artist_name: str):
+    """
+    아티스트 이미지를 비동기로 조회하고 DB 업데이트
+    
+    API 호출 순서 (fallback 체인):
+    1. Wikidata API (1차)
+    2. Deezer API (2차 fallback)
+    
+    Args:
+        artist_id: Artist 모델의 ID
+        artist_name: 아티스트 이름
+        
+    Returns:
+        이미지 URL 또는 None
+    """
+    try:
+        logger.info(f"[아티스트 이미지] 조회 시작: artist_id={artist_id}, name={artist_name}")
+        
+        # Artist 객체 조회
+        try:
+            artist = Artists.objects.get(artist_id=artist_id, is_deleted=False)
+        except Artists.DoesNotExist:
+            logger.error(f"[아티스트 이미지] Artist를 찾을 수 없음: artist_id={artist_id}")
+            return None
+        
+        # 이미 이미지가 있으면 스킵
+        if artist.artist_image and artist.artist_image.strip():
+            logger.info(f"[아티스트 이미지] 이미 이미지가 있음: artist_id={artist_id}")
+            return artist.artist_image
+        
+        image_url = None
+        source = None
+        
+        # 1차: Wikidata에서 이미지 조회
+        image_url = WikidataService.fetch_artist_image(artist_name)
+        if image_url:
+            source = "Wikidata"
+        
+        # 2차 fallback: Deezer에서 이미지 조회
+        if not image_url:
+            logger.info(f"[아티스트 이미지] Wikidata 실패, Deezer fallback 시도: {artist_name}")
+            image_url = DeezerService.fetch_artist_image(artist_name)
+            if image_url:
+                source = "Deezer"
+        
+        if image_url:
+            # DB 업데이트
+            artist.artist_image = image_url
+            artist.updated_at = timezone.now()
+            artist.save()
+            logger.info(f"[아티스트 이미지] 저장 완료 ({source}): artist_id={artist_id}, url={image_url[:50]}...")
+            return image_url
+        else:
+            logger.info(f"[아티스트 이미지] 모든 API에서 이미지를 찾지 못함: artist_id={artist_id}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"[아티스트 이미지] 실패: artist_id={artist_id}, 오류: {e}")
+        
+        if self.request.retries < self.max_retries:
+            logger.info(f"[아티스트 이미지] 재시도: {self.request.retries + 1}/{self.max_retries}")
+            raise self.retry(exc=e, countdown=30)
+        
+        return None
+
+
+@shared_task(bind=True, max_retries=2)
+def fetch_lyrics_task(self, music_id: int, artist_name: str, track_name: str, duration: int = None):
+    """
+    가사를 비동기로 조회하고 DB 업데이트
+    
+    API 호출 순서 (fallback 체인):
+    1. LRCLIB API (1차) - 동기화된 LRC 가사 지원
+    2. lyrics.ovh API (2차 fallback) - 일반 텍스트 가사
+    
+    Args:
+        music_id: Music 모델의 ID
+        artist_name: 아티스트 이름
+        track_name: 곡 이름
+        duration: 곡 길이 (초 단위)
+        
+    Returns:
+        가사 문자열 또는 None
+    """
+    try:
+        logger.info(f"[가사 조회] 시작: music_id={music_id}, {artist_name} - {track_name}")
+        
+        # Music 객체 조회
+        try:
+            music = Music.objects.get(music_id=music_id, is_deleted=False)
+        except Music.DoesNotExist:
+            logger.error(f"[가사 조회] Music을 찾을 수 없음: music_id={music_id}")
+            return None
+        
+        # 이미 가사가 있으면 스킵
+        if music.lyrics and music.lyrics.strip():
+            logger.info(f"[가사 조회] 이미 가사가 있음: music_id={music_id}")
+            return music.lyrics
+        
+        lyrics = None
+        source = None
+        
+        # 1차: LRCLIB에서 가사 조회 (동기화된 LRC 가사 우선)
+        lyrics = LRCLIBService.fetch_lyrics(artist_name, track_name, duration)
+        if lyrics:
+            source = "LRCLIB"
+        
+        # 2차 fallback: lyrics.ovh에서 가사 조회
+        if not lyrics:
+            logger.info(f"[가사 조회] LRCLIB 실패, lyrics.ovh fallback 시도: {artist_name} - {track_name}")
+            lyrics = LyricsOvhService.fetch_lyrics(artist_name, track_name)
+            if lyrics:
+                source = "lyrics.ovh"
+        
+        if lyrics:
+            # DB 업데이트
+            music.lyrics = lyrics
+            music.updated_at = timezone.now()
+            music.save()
+            logger.info(f"[가사 조회] 저장 완료 ({source}): music_id={music_id}, 길이={len(lyrics)}")
+            return lyrics
+        else:
+            logger.info(f"[가사 조회] 모든 API에서 가사를 찾지 못함: music_id={music_id}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"[가사 조회] 실패: music_id={music_id}, 오류: {e}")
+        
+        if self.request.retries < self.max_retries:
+            logger.info(f"[가사 조회] 재시도: {self.request.retries + 1}/{self.max_retries}")
+            raise self.retry(exc=e, countdown=30)
+        
+        return None
 
 
 @shared_task(bind=True, max_retries=3)
