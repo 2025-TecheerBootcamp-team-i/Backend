@@ -7,7 +7,7 @@ from django.utils import timezone
 from .models import Music, AiInfo, Users, Artists, Albums
 from .music_generate.services import LlamaService, SunoAPIService
 from .music_generate.utils import extract_genre_from_prompt
-from .utils.s3_upload import download_and_upload_to_s3, is_suno_url, is_s3_url
+from .utils.s3_upload import download_and_upload_to_s3, is_suno_url, is_s3_url, upload_image_to_s3
 from .services import WikidataService, LRCLIBService, DeezerService, LyricsOvhService
 import logging
 
@@ -35,18 +35,24 @@ def test_task(self, message: str = "테스트 메시지", delay_seconds: int = 1
 @shared_task(bind=True, max_retries=2)
 def fetch_artist_image_task(self, artist_id: int, artist_name: str):
     """
-    아티스트 이미지를 비동기로 조회하고 DB 업데이트
+    아티스트 이미지를 비동기로 조회하고 S3에 업로드 후 DB 업데이트
     
     API 호출 순서 (fallback 체인):
     1. Wikidata API (1차)
     2. Deezer API (2차 fallback)
+    
+    이미지 처리:
+    1. 외부 API에서 이미지 URL 조회
+    2. S3에 업로드 (media/images/artists/original/)
+    3. Lambda가 자동으로 리사이징 (원형 228x228, 208x208 / 사각형 220x220)
+    4. DB에 S3 URL 저장
     
     Args:
         artist_id: Artist 모델의 ID
         artist_name: 아티스트 이름
         
     Returns:
-        이미지 URL 또는 None
+        S3 이미지 URL 또는 None
     """
     try:
         logger.info(f"[아티스트 이미지] 조회 시작: artist_id={artist_id}, name={artist_name}")
@@ -58,10 +64,13 @@ def fetch_artist_image_task(self, artist_id: int, artist_name: str):
             logger.error(f"[아티스트 이미지] Artist를 찾을 수 없음: artist_id={artist_id}")
             return None
         
-        # 이미 이미지가 있으면 스킵
+        # 이미 S3 이미지가 있으면 스킵
         if artist.artist_image and artist.artist_image.strip():
-            logger.info(f"[아티스트 이미지] 이미 이미지가 있음: artist_id={artist_id}")
-            return artist.artist_image
+            if is_s3_url(artist.artist_image):
+                logger.info(f"[아티스트 이미지] 이미 S3 이미지가 있음: artist_id={artist_id}")
+                return artist.artist_image
+            # S3 URL이 아니면 새로 업로드 진행
+            logger.info(f"[아티스트 이미지] 기존 URL이 S3가 아님, S3로 업로드 진행: artist_id={artist_id}")
         
         image_url = None
         source = None
@@ -79,12 +88,31 @@ def fetch_artist_image_task(self, artist_id: int, artist_name: str):
                 source = "Deezer"
         
         if image_url:
-            # DB 업데이트
-            artist.artist_image = image_url
-            artist.updated_at = timezone.now()
-            artist.save()
-            logger.info(f"[아티스트 이미지] 저장 완료 ({source}): artist_id={artist_id}, url={image_url[:50]}...")
-            return image_url
+            # S3에 이미지 업로드 (Lambda가 자동으로 리사이징)
+            try:
+                s3_url = upload_image_to_s3(
+                    image_url=image_url,
+                    image_type='artists',
+                    entity_id=artist_id,
+                    entity_name=artist_name
+                )
+                logger.info(f"[아티스트 이미지] S3 업로드 완료 ({source}): artist_id={artist_id}")
+                
+                # DB 업데이트 (S3 URL 저장)
+                artist.artist_image = s3_url
+                artist.updated_at = timezone.now()
+                artist.save()
+                logger.info(f"[아티스트 이미지] DB 저장 완료: artist_id={artist_id}, url={s3_url[:80]}...")
+                return s3_url
+                
+            except Exception as upload_error:
+                # S3 업로드 실패 시 원본 URL이라도 저장
+                logger.warning(f"[아티스트 이미지] S3 업로드 실패, 원본 URL 저장: {upload_error}")
+                artist.artist_image = image_url
+                artist.updated_at = timezone.now()
+                artist.save()
+                logger.info(f"[아티스트 이미지] 원본 URL 저장 완료 ({source}): artist_id={artist_id}")
+                return image_url
         else:
             logger.info(f"[아티스트 이미지] 모든 API에서 이미지를 찾지 못함: artist_id={artist_id}")
             return None
