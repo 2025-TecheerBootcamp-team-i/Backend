@@ -841,13 +841,20 @@ def save_itunes_track_to_db_task(self, itunes_data: dict):
                 artist, created = Artists.objects.get_or_create(
                     artist_name=artist_name,
                     defaults={
-                        'artist_image': itunes_data.get('artist_image', ''),
+                        'artist_image': '',  # 비동기로 수집
                         'created_at': now,
                         'is_deleted': False,
                     }
                 )
                 if created:
                     logger.info(f"[iTunes 저장] Artist 생성: {artist_name}")
+                
+                # 아티스트 이미지 비동기 수집 (새로 생성되었거나 이미지가 없는 경우)
+                if created or not artist.artist_image:
+                    try:
+                        fetch_artist_image_task.delay(artist.artist_id, artist_name)
+                    except Exception as e:
+                        logger.warning(f"[iTunes 저장] 아티스트 이미지 태스크 호출 실패: {e}")
             
             # Album 생성 또는 조회
             # - 같은 아티스트의 같은 앨범이 있으면 재사용
