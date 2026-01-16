@@ -12,7 +12,7 @@ from drf_spectacular.types import OpenApiTypes
 from ..models import Music, MusicTags, Tags, Artists, Albums
 from ..serializers import iTunesSearchResultSerializer
 from ..services import iTunesService
-from ..tasks import fetch_artist_image_task
+from ..tasks import fetch_artist_image_task, fetch_album_image_task
 from .common import MusicPagination
 
 
@@ -236,16 +236,32 @@ class MusicSearchView(APIView):
                         # 앨범 조회 또는 생성
                         try:
                             artist = Artists.objects.get(artist_id=artist_id)
-                            album, _ = Albums.objects.get_or_create(
+                            album, album_created = Albums.objects.get_or_create(
                                 album_name=album_name,
                                 artist=artist,
                                 defaults={
-                                    'album_image': item.get('album_image', ''),
+                                    'album_image': '',  # 비동기로 수집
                                     'created_at': timezone.now(),
                                     'is_deleted': False,
                                 }
                             )
                             album_key_to_id[album_key] = album.album_id
+                            
+                            # 앨범 이미지 비동기 수집 (새로 생성되었거나 이미지가 없는 경우)
+                            album_image_url = item.get('album_image', '')
+                            if album_image_url and (album_created or not album.album_image):
+                                try:
+                                    fetch_album_image_task.delay(
+                                        album.album_id, 
+                                        album_name, 
+                                        album_image_url
+                                    )
+                                except Exception as e:
+                                    # 태스크 호출 실패해도 기본 저장은 완료되도록 함
+                                    import logging
+                                    logging.getLogger(__name__).warning(
+                                        f"앨범 이미지 태스크 호출 실패: {e}"
+                                    )
                         except Artists.DoesNotExist:
                             album_key_to_id[album_key] = None
                     

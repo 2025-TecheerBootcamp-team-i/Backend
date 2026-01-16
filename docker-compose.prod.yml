@@ -1,0 +1,93 @@
+services:
+  # Django 백엔드 애플리케이션 (프로덕션용 이미지)
+  backend:
+    image: hhyuninu/2025_techeer_team_i:1.0.39
+    ports:
+      - "8000:8000"
+    environment:
+      # 프로덕션 환경 변수 (Portainer에서 설정하거나 .env 파일 사용)
+      - POSTGRES_DB=music_db
+      - POSTGRES_USER=music_user
+      - POSTGRES_PASSWORD=music_password
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+    depends_on:
+      - db
+      - rabbitmq
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.backend.loadbalancer.server.port=8000
+      - traefik.http.routers.backend.entryPoints=websecure
+      - traefik.http.routers.backend.rule=Host(`api.brokencarrot.my`)
+      - traefik.http.routers.backend.tls.certResolver=letsencrypt
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
+
+  # PostgreSQL 데이터베이스
+  db:
+    image: postgres:18
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    environment:
+      - POSTGRES_USER=music_user
+      - POSTGRES_PASSWORD=music_password
+      - POSTGRES_DB=music_db
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U music_user -d music_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ 메시지 브로커 (Celery용)
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "15672:15672"  # 관리 UI (선택사항)
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
+
+  # Celery 워커 (비동기 작업 처리)
+  celery:
+    image: hhyuninu/2025_techeer_team_i:1.0.39
+    command: celery -A config worker -l info
+    environment:
+      - POSTGRES_DB=music_db
+      - POSTGRES_USER=music_user
+      - POSTGRES_PASSWORD=music_password
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+    depends_on:
+      - db
+      - rabbitmq
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
+
+  # Flower (Celery 모니터링)
+  flower:
+    image: hhyuninu/2025_techeer_team_i:1.0.39
+    command: celery -A config flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+    depends_on:
+      - rabbitmq
+      - celery
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  ubuntu_gitops-network:
+    external: true

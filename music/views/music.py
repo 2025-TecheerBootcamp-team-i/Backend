@@ -12,7 +12,7 @@ from drf_spectacular.types import OpenApiTypes
 from ..models import Music, Artists, Albums, PlayLogs
 from ..serializers import MusicDetailSerializer, MusicPlaySerializer
 from ..services import iTunesService
-from ..tasks import fetch_artist_image_task, fetch_lyrics_task, save_itunes_track_to_db_task
+from ..tasks import fetch_artist_image_task, fetch_album_image_task, fetch_lyrics_task, save_itunes_track_to_db_task
 
 
 class MusicDetailView(APIView):
@@ -54,16 +54,27 @@ class MusicDetailView(APIView):
         # Album 생성 또는 조회
         album_name = itunes_data.get('album_name', '')
         album = None
+        album_created = False
         if album_name and artist:
-            album, _ = Albums.objects.get_or_create(
+            album, album_created = Albums.objects.get_or_create(
                 album_name=album_name,
                 artist=artist,
                 defaults={
-                    'album_image': itunes_data.get('album_image', ''),
+                    'album_image': '',  # 비동기로 수집
                     'created_at': timezone.now(),
                     'is_deleted': False,
                 }
             )
+            
+            # 앨범 이미지 비동기 수집 (새로 생성되었거나 이미지가 없는 경우)
+            album_image_url = itunes_data.get('album_image', '')
+            if album_image_url and (album_created or not album.album_image):
+                try:
+                    fetch_album_image_task.delay(album.album_id, album_name, album_image_url)
+                except Exception as e:
+                    # 태스크 호출 실패해도 기본 저장은 완료되도록 함
+                    import logging
+                    logging.getLogger(__name__).warning(f"앨범 이미지 태스크 호출 실패: {e}")
         
         # Music 생성 (가사는 비동기로 수집하므로 빈 값으로 저장)
         music = Music.objects.create(
