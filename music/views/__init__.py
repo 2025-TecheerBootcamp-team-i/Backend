@@ -35,6 +35,15 @@ from .statistics import (
     UserAIGenerationView,
 )
 
+# 플레이리스트 관련 Views
+from .playlist import (
+    PlaylistListCreateView,
+    PlaylistDetailView,
+    PlaylistItemAddView,
+    PlaylistItemDeleteView,
+    PlaylistLikeView,
+)
+
 # 레거시 함수 기반 Views (웹 페이지 및 음악 생성)
 from .legacy import (
     music_generator_page,
@@ -77,6 +86,12 @@ __all__ = [
     'UserTopArtistsView',
     'UserTopTagsView',
     'UserAIGenerationView',
+    # playlist
+    'PlaylistListCreateView',
+    'PlaylistDetailView',
+    'PlaylistItemAddView',
+    'PlaylistItemDeleteView',
+    'PlaylistLikeView',
     # legacy (함수 기반)
     'music_generator_page',
     'music_list_page',

@@ -24,6 +24,12 @@ from .views import (
     UserTopArtistsView,
     UserTopTagsView,
     UserAIGenerationView,
+    # 플레이리스트
+    PlaylistListCreateView,
+    PlaylistDetailView,
+    PlaylistItemAddView,
+    PlaylistItemDeleteView,
+    PlaylistLikeView,
 )
 
 app_name = 'music'
@@ -71,6 +77,33 @@ urlpatterns = [
     # POST /api/v1/tracks/{music_id}/likes
     # DELETE /api/v1/tracks/{music_id}/likes
     path('tracks/<int:music_id>/likes', MusicLikeView.as_view(), name='music-like'),
+    
+    # ========================
+    # 플레이리스트 API
+    # ========================
+    # 플레이리스트 목록 조회 (GET) & 생성 (POST)
+    # GET /api/v1/playlists  - 목록 조회
+    # POST /api/v1/playlists - 생성
+    path('playlists', PlaylistListCreateView.as_view(), name='playlist-list-create'),
+    
+    # 플레이리스트 상세 조회 (GET) & 수정 (PATCH) & 삭제 (DELETE)
+    # GET /api/v1/playlists/{playlistId}    - 상세 조회
+    # PATCH /api/v1/playlists/{playlistId}  - 수정
+    # DELETE /api/v1/playlists/{playlistId} - 삭제
+    path('playlists/<int:playlist_id>', PlaylistDetailView.as_view(), name='playlist-detail'),
+    
+    # 플레이리스트 곡 추가 (POST)
+    # POST /api/v1/playlists/{playlistId}/items
+    path('playlists/<int:playlist_id>/items', PlaylistItemAddView.as_view(), name='playlist-item-add'),
+    
+    # 플레이리스트 곡 삭제 (DELETE)
+    # DELETE /api/v1/playlists/items/{itemsId}
+    path('playlists/items/<int:item_id>', PlaylistItemDeleteView.as_view(), name='playlist-item-delete'),
+    
+    # 플레이리스트 좋아요 등록 (POST) & 취소 (DELETE)
+    # POST /api/v1/playlists/{playlistId}/likes   - 좋아요
+    # DELETE /api/v1/playlists/{playlistId}/likes - 좋아요 취소
+    path('playlists/<int:playlist_id>/likes', PlaylistLikeView.as_view(), name='playlist-like'),
     
     # 웹 페이지 (UI)
     path('generator/', views.music_generator_page, name='music_generator_page'),
