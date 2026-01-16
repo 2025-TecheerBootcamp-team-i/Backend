@@ -12,6 +12,7 @@ from drf_spectacular.types import OpenApiTypes
 from ..models import Music, Artists, Albums, PlayLogs
 from ..serializers import MusicDetailSerializer, MusicPlaySerializer
 from ..services import iTunesService
+from ..tasks import fetch_artist_image_task, fetch_lyrics_task, save_itunes_track_to_db_task
 
 
 class MusicDetailView(APIView):
@@ -30,15 +31,21 @@ class MusicDetailView(APIView):
         """
         iTunes 데이터로부터 Music 객체 생성
         Artist, Album도 함께 생성/조회
+        
+        추가로 Celery 비동기 태스크를 호출하여:
+        - Wikidata에서 아티스트 이미지 조회
+        - LRCLIB에서 가사 조회
         """
-        # Artist 생성 또는 조회
         artist_name = itunes_data.get('artist_name', '')
         artist = None
+        artist_created = False
+        
         if artist_name:
-            artist, _ = Artists.objects.get_or_create(
+            # Artist 생성/조회 (이미지는 비동기로 수집하므로 빈 값으로 저장)
+            artist, artist_created = Artists.objects.get_or_create(
                 artist_name=artist_name,
                 defaults={
-                    'artist_image': itunes_data.get('artist_image', ''),
+                    'artist_image': '',  # Wikidata에서 비동기로 수집
                     'created_at': timezone.now(),
                     'is_deleted': False,
                 }
@@ -58,7 +65,7 @@ class MusicDetailView(APIView):
                 }
             )
         
-        # Music 생성
+        # Music 생성 (가사는 비동기로 수집하므로 빈 값으로 저장)
         music = Music.objects.create(
             itunes_id=itunes_data.get('itunes_id'),
             music_name=itunes_data.get('music_name', ''),
@@ -67,10 +74,33 @@ class MusicDetailView(APIView):
             genre=itunes_data.get('genre', ''),
             duration=itunes_data.get('duration'),
             audio_url=itunes_data.get('audio_url', ''),
-            is_ai=False,  # iTunes 곡은 기성곡
+            lyrics=None,  # LRCLIB에서 비동기로 수집
+            is_ai=False,
             created_at=timezone.now(),
             is_deleted=False,
         )
+        
+        # 비동기 태스크 호출: 아티스트 이미지 수집 (새로 생성되었거나 이미지가 없는 경우)
+        if artist and (artist_created or not artist.artist_image):
+            try:
+                fetch_artist_image_task.delay(artist.artist_id, artist.artist_name)
+            except Exception as e:
+                # 태스크 호출 실패해도 기본 저장은 완료되도록 함
+                import logging
+                logging.getLogger(__name__).warning(f"아티스트 이미지 태스크 호출 실패: {e}")
+        
+        # 비동기 태스크 호출: 가사 수집
+        if artist_name and itunes_data.get('music_name'):
+            try:
+                fetch_lyrics_task.delay(
+                    music.music_id,
+                    artist_name,
+                    itunes_data.get('music_name', ''),
+                    itunes_data.get('duration')
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"가사 태스크 호출 실패: {e}")
         
         return music
     
@@ -79,11 +109,12 @@ class MusicDetailView(APIView):
         description="""
         iTunes ID를 사용하여 음악 상세 정보 조회
         
-        **동작:**
+        **동작 (성능 최적화):**
         - DB에 이미 있으면: DB 데이터 반환 (200 OK)
-        - DB에 없으면: iTunes Lookup API 호출 → DB 저장 → 반환 (201 Created)
+        - DB에 없으면: iTunes Lookup API 호출 → 즉시 응답 (202 Accepted)
+          - DB 저장은 백그라운드로 비동기 처리 (50-200ms 절약)
         
-        **저장 내용:**
+        **저장 내용 (백그라운드):**
         - Artist, Album 자동 생성/조회
         - Music 정보 저장
         - 태그는 빈 상태로 저장 (추후 수동 추가 필요)
@@ -106,27 +137,26 @@ class MusicDetailView(APIView):
         ],
         responses={
             200: MusicDetailSerializer,
-            201: MusicDetailSerializer,
-            404: {'description': 'Not Found - iTunes에서 해당 ID를 찾을 수 없음'},
-            500: {'description': 'Internal Server Error - 저장 중 오류 발생'}
+            202: {'description': 'Accepted - iTunes 데이터 반환 (DB 저장은 백그라운드 처리 중)'},
+            404: {'description': 'Not Found - iTunes에서 해당 ID를 찾을 수 없음'}
         },
         tags=['음악 상세']
     )
     def get(self, request, itunes_id):
-        """iTunes ID로 음악 상세 조회"""
+        """iTunes ID로 음악 상세 조회 (방안 2: DB 저장 비동기 처리)"""
         
-        # 1. DB에서 조회
+        # 1. DB에서 조회 (이미 저장된 곡인지 확인)
         try:
             music = Music.objects.select_related('artist', 'album').get(
                 itunes_id=itunes_id,
                 is_deleted=False
             )
-            # DB에 있으면 바로 반환
+            # DB에 이미 있으면 바로 반환 (빠른 응답)
             serializer = MusicDetailSerializer(music)
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
             
         except Music.DoesNotExist:
-            # 2. DB에 없으면 iTunes API 호출
+            # 2. DB에 없으면 iTunes API 호출 (외부 API 호출, 500ms~2초 소요)
             itunes_data = iTunesService.lookup(itunes_id)
             
             if not itunes_data:
@@ -135,22 +165,39 @@ class MusicDetailView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # 3. iTunes 데이터 파싱
+            # 3. iTunes 데이터 파싱 (약 5-10ms)
             parsed_data = iTunesService.parse_track_data(itunes_data)
             
-            # 4. DB에 저장
-            try:
-                music = self.create_music_from_itunes(parsed_data)
-                
-                # 5. 저장된 데이터 반환
-                serializer = MusicDetailSerializer(music)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-                
-            except Exception as e:
-                return Response(
-                    {'error': f'음악 저장 중 오류 발생: {str(e)}'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+            # 4. 🚀 핵심: DB 저장은 Celery 백그라운드로 비동기 처리
+            #    - DB 저장 시간(50-200ms) 절약
+            #    - 사용자는 즉시 응답 받음
+            #    - Celery 워커가 백그라운드에서 DB에 저장 처리
+            save_itunes_track_to_db_task.delay(parsed_data)
+            
+            # 5. 파싱된 데이터를 즉시 응답 반환 (DB 저장 완료를 기다리지 않음)
+            #    - 프론트엔드는 이 데이터로 바로 음악 재생 가능
+            #    - DB 저장은 백그라운드에서 진행 중
+            response_data = {
+                'itunes_id': parsed_data.get('itunes_id'),
+                'music_name': parsed_data.get('music_name'),
+                'artist': {
+                    'artist_name': parsed_data.get('artist_name'),
+                    'artist_image': parsed_data.get('artist_image'),
+                },
+                'album': {
+                    'album_name': parsed_data.get('album_name'),
+                    'album_image': parsed_data.get('album_image'),
+                },
+                'genre': parsed_data.get('genre'),
+                'duration': parsed_data.get('duration'),
+                'audio_url': parsed_data.get('audio_url'),  # 30초 미리듣기 URL
+                'is_ai': False,  # iTunes 곡은 AI 생성곡이 아님
+                'tags': [],  # 새로 저장되는 곡은 태그 없음
+                'created_at': timezone.now().isoformat(),
+            }
+            
+            # 202 Accepted: 요청을 수락했지만 처리가 완료되지 않음 (비동기 처리 중)
+            return Response(response_data, status=status.HTTP_202_ACCEPTED)
 
 
 class MusicPlayView(APIView):

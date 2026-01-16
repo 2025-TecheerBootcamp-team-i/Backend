@@ -1,0 +1,52 @@
+# Loki 설정 파일
+# 로그 수집 및 저장 설정
+
+auth_enabled: false  # 개발 환경에서는 인증 비활성화
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common: # Loki 서버 설정 (로그 저장 및 복제 설정)
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+query_range: # 쿼리 범위 설정 (로그 조회 성능 최적화)
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+
+schema_config: # 스키마 설정 (로그 저장 형식 설정)
+  configs:
+    - from: 2020-10-24
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+ruler: # 경보 관리 설정 (경보 관리 설정)
+  alertmanager_url: http://localhost:9093
+
+limits_config: # 제한 설정 (로그 저장 제한 설정)
+  retention_period: 168h  # 로그 보존 기간: 7일
+  ingestion_rate_mb: 10
+  ingestion_burst_size_mb: 20
+  max_streams_per_user: 10000
+  max_line_size: 256kb
+
+# 테이블 관리 (자동 삭제)
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 168h  # 7일

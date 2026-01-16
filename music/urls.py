@@ -5,12 +5,31 @@ from django.urls import path
 from . import views
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
-    RegisterView, 
-    LoginView, 
+    RegisterView,
+    LoginView,
+    TokenRefreshView,
     MusicLikeView,
     MusicSearchView,
     MusicDetailView,
-    MusicPlayView
+    MusicPlayView,
+    ArtistDetailView,
+    ArtistTracksView,
+    ArtistAlbumsView,
+    ErrorTestView,
+    DatabaseQueryTestView,
+    # 사용자 통계
+    UserStatisticsView,
+    UserListeningTimeView,
+    UserTopGenresView,
+    UserTopArtistsView,
+    UserTopTagsView,
+    UserAIGenerationView,
+    # 플레이리스트
+    PlaylistListCreateView,
+    PlaylistDetailView,
+    PlaylistItemAddView,
+    PlaylistItemDeleteView,
+    PlaylistLikeView,
 )
 
 app_name = 'music'
@@ -24,6 +43,12 @@ urlpatterns = [
     path('auth/tokens/', LoginView.as_view(), name='login'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
+    # 테스트용 엔드포인트
+    # GET /api/v1/test/error?code=500&rate=0.5  # 에러율 테스트
+    path('test/error', ErrorTestView.as_view(), name='error-test'),
+    # GET /api/v1/test/db?count=10  # Database Queries 테스트
+    path('test/db', DatabaseQueryTestView.as_view(), name='db-test'),
+    
     # iTunes 기반 검색 (새로운 메인 검색)
     # GET /api/v1/search?q={검색어}&exclude_ai={true|false}
     path('search', MusicSearchView.as_view(), name='itunes-search'),
@@ -35,11 +60,50 @@ urlpatterns = [
     # 음악 재생 (audio_url 반환 및 재생 로그 기록)
     # GET /api/v1/tracks/{music_id}/play
     path('tracks/<int:music_id>/play', MusicPlayView.as_view(), name='music-play'),
+
+    # 아티스트 단일 조회
+    # GET /api/v1/artists/{artist_id}/
+    path('artists/<int:artist_id>/', ArtistDetailView.as_view(), name='artist-detail'),
+    
+    # 아티스트별 곡 목록 조회
+    # GET /api/v1/artists/{artist_id}/tracks/
+    path('artists/<int:artist_id>/tracks/', ArtistTracksView.as_view(), name='artist-tracks'),
+    
+    # 아티스트별 앨범 목록 조회
+    # GET /api/v1/artists/{artist_id}/albums/
+    path('artists/<int:artist_id>/albums/', ArtistAlbumsView.as_view(), name='artist-albums'),
     
     # 좋아요 등록/취소
     # POST /api/v1/tracks/{music_id}/likes
     # DELETE /api/v1/tracks/{music_id}/likes
     path('tracks/<int:music_id>/likes', MusicLikeView.as_view(), name='music-like'),
+    
+    # ========================
+    # 플레이리스트 API
+    # ========================
+    # 플레이리스트 목록 조회 (GET) & 생성 (POST)
+    # GET /api/v1/playlists  - 목록 조회
+    # POST /api/v1/playlists - 생성
+    path('playlists', PlaylistListCreateView.as_view(), name='playlist-list-create'),
+    
+    # 플레이리스트 상세 조회 (GET) & 수정 (PATCH) & 삭제 (DELETE)
+    # GET /api/v1/playlists/{playlistId}    - 상세 조회
+    # PATCH /api/v1/playlists/{playlistId}  - 수정
+    # DELETE /api/v1/playlists/{playlistId} - 삭제
+    path('playlists/<int:playlist_id>', PlaylistDetailView.as_view(), name='playlist-detail'),
+    
+    # 플레이리스트 곡 추가 (POST)
+    # POST /api/v1/playlists/{playlistId}/items
+    path('playlists/<int:playlist_id>/items', PlaylistItemAddView.as_view(), name='playlist-item-add'),
+    
+    # 플레이리스트 곡 삭제 (DELETE)
+    # DELETE /api/v1/playlists/items/{itemsId}
+    path('playlists/items/<int:item_id>', PlaylistItemDeleteView.as_view(), name='playlist-item-delete'),
+    
+    # 플레이리스트 좋아요 등록 (POST) & 취소 (DELETE)
+    # POST /api/v1/playlists/{playlistId}/likes   - 좋아요
+    # DELETE /api/v1/playlists/{playlistId}/likes - 좋아요 취소
+    path('playlists/<int:playlist_id>/likes', PlaylistLikeView.as_view(), name='playlist-like'),
     
     # 웹 페이지 (UI)
     path('generator/', views.music_generator_page, name='music_generator_page'),
@@ -67,4 +131,31 @@ urlpatterns = [
     
     # 음악 상세 조회
     path('<int:music_id>/', views.get_music_detail, name='get_music_detail'),
+    
+    # ========================
+    # 사용자 통계 API
+    # ========================
+    # 전체 통계 조회
+    # GET /api/v1/users/{user_id}/statistics/?period=month|all
+    path('users/<int:user_id>/statistics/', UserStatisticsView.as_view(), name='user-statistics'),
+    
+    # 청취 시간 통계
+    # GET /api/v1/users/{user_id}/statistics/listening-time/
+    path('users/<int:user_id>/statistics/listening-time/', UserListeningTimeView.as_view(), name='user-listening-time'),
+    
+    # Top 장르 통계
+    # GET /api/v1/users/{user_id}/statistics/genres/?limit=3
+    path('users/<int:user_id>/statistics/genres/', UserTopGenresView.as_view(), name='user-top-genres'),
+    
+    # Top 아티스트 통계
+    # GET /api/v1/users/{user_id}/statistics/artists/?limit=3
+    path('users/<int:user_id>/statistics/artists/', UserTopArtistsView.as_view(), name='user-top-artists'),
+    
+    # Top 태그(분위기/키워드) 통계
+    # GET /api/v1/users/{user_id}/statistics/tags/?limit=6
+    path('users/<int:user_id>/statistics/tags/', UserTopTagsView.as_view(), name='user-top-tags'),
+    
+    # AI 생성 활동 통계
+    # GET /api/v1/users/{user_id}/statistics/ai-generation/
+    path('users/<int:user_id>/statistics/ai-generation/', UserAIGenerationView.as_view(), name='user-ai-generation'),
 ]

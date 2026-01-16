@@ -6,11 +6,13 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
-from ..models import Music, MusicTags, Tags
+from ..models import Music, MusicTags, Tags, Artists, Albums
 from ..serializers import iTunesSearchResultSerializer
 from ..services import iTunesService
+from ..tasks import fetch_artist_image_task
 from .common import MusicPagination
 
 
@@ -177,9 +179,79 @@ class MusicSearchView(APIView):
             
             existing_set = set(existing_music)
             
+            # 아티스트 이름으로 DB에서 아티스트 ID 조회 및 생성 (일괄 처리)
+            artist_names = list(set([r.get('artist_name') for r in parsed_results if r.get('artist_name')]))
+            artist_name_to_id = {}
+            if artist_names:
+                # DB에 있는 아티스트 조회
+                existing_artists = Artists.objects.filter(
+                    artist_name__in=artist_names,
+                    is_deleted__in=[False, None]
+                ).values('artist_id', 'artist_name')
+                artist_name_to_id = {a['artist_name']: a['artist_id'] for a in existing_artists}
+                
+                # DB에 없는 아티스트 생성
+                for artist_name in artist_names:
+                    if artist_name not in artist_name_to_id:
+                        artist, artist_created = Artists.objects.get_or_create(
+                            artist_name=artist_name,
+                            defaults={
+                                'artist_image': '',  # 비동기로 수집
+                                'created_at': timezone.now(),
+                                'is_deleted': False,
+                            }
+                        )
+                        artist_name_to_id[artist_name] = artist.artist_id
+                        
+                        # 아티스트 이미지 비동기 수집 (새로 생성되었거나 이미지가 없는 경우)
+                        if artist_created or not artist.artist_image:
+                            try:
+                                fetch_artist_image_task.delay(artist.artist_id, artist_name)
+                            except Exception as e:
+                                # 태스크 호출 실패해도 기본 저장은 완료되도록 함
+                                import logging
+                                logging.getLogger(__name__).warning(
+                                    f"아티스트 이미지 태스크 호출 실패: {e}"
+                                )
+            
+            # 앨범 이름과 아티스트 조합으로 DB에서 앨범 ID 조회 및 생성
+            # 앨범은 아티스트별로 처리해야 하므로 결과별로 처리
+            album_key_to_id = {}  # (album_name, artist_id) -> album_id
+            
             for item in parsed_results:
                 item['in_db'] = item.get('itunes_id') in existing_set
                 item['has_matching_tags'] = False  # 기본값
+                
+                # 아티스트 ID 추가 (없으면 생성했으므로 항상 있음)
+                artist_name = item.get('artist_name')
+                item['artist_id'] = artist_name_to_id.get(artist_name) if artist_name else None
+                
+                # 앨범 ID 추가 (아티스트가 있어야 앨범 생성 가능)
+                album_name = item.get('album_name')
+                artist_id = item['artist_id']
+                
+                if album_name and artist_id:
+                    album_key = (album_name, artist_id)
+                    if album_key not in album_key_to_id:
+                        # 앨범 조회 또는 생성
+                        try:
+                            artist = Artists.objects.get(artist_id=artist_id)
+                            album, _ = Albums.objects.get_or_create(
+                                album_name=album_name,
+                                artist=artist,
+                                defaults={
+                                    'album_image': item.get('album_image', ''),
+                                    'created_at': timezone.now(),
+                                    'is_deleted': False,
+                                }
+                            )
+                            album_key_to_id[album_key] = album.album_id
+                        except Artists.DoesNotExist:
+                            album_key_to_id[album_key] = None
+                    
+                    item['album_id'] = album_key_to_id[album_key]
+                else:
+                    item['album_id'] = None
             
             results = parsed_results
         
@@ -224,7 +296,9 @@ class MusicSearchView(APIView):
                         'itunes_id': music.itunes_id,
                         'music_name': music.music_name,
                         'artist_name': music.artist.artist_name if music.artist else '',
+                        'artist_id': music.artist.artist_id if music.artist else None,
                         'album_name': music.album.album_name if music.album else '',
+                        'album_id': music.album.album_id if music.album else None,
                         'genre': music.genre or '',
                         'duration': music.duration,
                         'audio_url': music.audio_url,

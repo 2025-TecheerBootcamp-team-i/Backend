@@ -10,6 +10,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, parser_classes, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from drf_spectacular.utils import extend_schema
 from ..models import Music, AiInfo, Users, Artists, Albums
 # 레거시 serializers는 legacy_serializers 모듈에서 직접 import
 from ..legacy_serializers import (
@@ -29,6 +30,11 @@ from ..utils.s3_upload import is_suno_url, is_s3_url
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @parser_classes([FlexibleJSONParser])
+@extend_schema(
+    summary="AI 음악 생성 (동기) - 웹 페이지용",
+    description="Suno API를 사용한 AI 음악 생성 (동기 처리, 완료까지 대기) - 웹 페이지 템플릿에서 사용",
+    tags=['AI 음악 생성 (웹 페이지)']
+)
 def generate_music(request):
     """
     AI 음악 생성 API 엔드포인트
@@ -79,13 +85,10 @@ def generate_music(request):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         
-        # Llama가 생성한 파라미터 추출
-        # 제목은 이제 Llama가 만든 것을 쓰지 않고, 사용자가 입력한 내용을 그대로 사용
-        llama_title = music_params.get('title', user_prompt[:50])
+        # Llama가 생성한 파라미터 추출 (title은 Suno가 생성하므로 제외)
         llama_style = music_params.get('style', 'K-Pop')
         llama_prompt = music_params.get('prompt', '')
         
-        print(f"[Llama 결과] title: {llama_title}")
         print(f"[Llama 결과] style: {llama_style}")
         print(f"[Llama 결과] prompt: {llama_prompt}")
         
@@ -141,14 +144,23 @@ def generate_music(request):
                     return value
             return None
         
+        # 제목 결정 헬퍼: 'AI Generated Song' 같은 기본값은 무시
+        def get_valid_title(api_title):
+            """API 제목이 의미있는 값인지 확인. 기본값이면 None 반환"""
+            invalid_titles = ['AI Generated Song', 'Untitled', 'Unknown', '', None]
+            if api_title in invalid_titles:
+                return None
+            return api_title
+        
         # 응답 형식 1: sunoData 리스트
         suno_data = music_result.get('sunoData', [])
         if isinstance(suno_data, list) and len(suno_data) > 0:
             print(f"[데이터 추출] sunoData 리스트 형식 발견 (길이: {len(suno_data)})")
             first_song = suno_data[0]
             audio_url = extract_field(first_song, 'audioUrl', 'audio_url', 'url', 'audio', 'audioFile')
-            # 제목은 Suno가 생성한 제목을 우선 사용하고, 없으면 사용자 입력을 fallback으로 사용
-            music_title = extract_field(first_song, 'title', 'name', 'song_name', 'songName') or user_prompt[:50]
+            # 제목: 사용자 입력 우선, API 제목은 의미있는 경우에만 사용
+            api_title = extract_field(first_song, 'title', 'name', 'song_name', 'songName')
+            music_title = user_prompt[:50]  # 사용자 입력을 기본값으로 사용
             duration = extract_field(first_song, 'duration', 'length', 'time', 'duration_seconds')
             lyrics = extract_field(first_song, 'lyrics', 'lyric', 'text', 'song_lyrics')
             image_url = extract_field(first_song, 'imageUrl', 'image_url', 'image', 'cover', 'cover_url', 'cover_url')
@@ -161,8 +173,9 @@ def generate_music(request):
         elif isinstance(music_result, dict):
             print(f"[데이터 추출] 직접 필드 접근 형식")
             audio_url = extract_field(music_result, 'audioUrl', 'audio_url', 'url', 'audio', 'audioFile')
-            # 제목은 Suno가 생성한 제목을 우선 사용하고, 없으면 사용자 입력을 fallback으로 사용
-            music_title = extract_field(music_result, 'title', 'name', 'song_name', 'songName') or music_result.get('title') or user_prompt[:50]
+            # 제목: 사용자 입력 우선 (API 기본값 'AI Generated Song' 무시)
+            api_title = extract_field(music_result, 'title', 'name', 'song_name', 'songName')
+            music_title = user_prompt[:50]  # 사용자 입력을 기본값으로 사용
             duration = extract_field(music_result, 'duration', 'length', 'time', 'duration_seconds')
             lyrics = extract_field(music_result, 'lyrics', 'lyric', 'text', 'song_lyrics')
             image_url = extract_field(music_result, 'imageUrl', 'image_url', 'image', 'cover', 'cover_url')
@@ -177,8 +190,6 @@ def generate_music(request):
             # Polling 실패 시에도 기본 데이터는 music_result에 포함되어 있음
             if isinstance(music_result, dict):
                 audio_url = music_result.get('audioUrl')
-                # 제목은 Suno가 생성한 제목을 우선 사용하고, 없으면 사용자 입력을 fallback으로 사용
-                music_title = music_result.get('title') or user_prompt[:50]
                 duration = music_result.get('duration')
                 lyrics = music_result.get('lyrics')
                 image_url = music_result.get('imageUrl')
@@ -186,12 +197,13 @@ def generate_music(request):
                 audio_id = music_result.get('audioId') or music_result.get('audio_id') or music_result.get('id')
             else:
                 audio_url = None
-                music_title = user_prompt[:50]
                 duration = None
                 lyrics = None
                 image_url = None
                 api_genre = llama_style
                 audio_id = None
+            # 제목: 사용자 입력 사용
+            music_title = user_prompt[:50]
             valence = None
             arousal = None
         
@@ -336,10 +348,12 @@ def generate_music(request):
         
         try:
             # 7. AiInfo 모델에 프롬프트 정보 저장
+            # task_id 필드를 직접 설정해야 webhook 태스크에서 찾을 수 있음
             print(f"[DB 저장] AiInfo 저장 시작: task_id={task_id}")
             ai_info = AiInfo.objects.create(
                 music=music,
-                input_prompt=f"TaskID: {task_id}\nOriginal: {user_prompt}\nTitle: {llama_title}\nStyle: {llama_style}\nPrompt: {llama_prompt}",
+                task_id=task_id,  # Webhook 태스크에서 이 필드로 검색함
+                input_prompt=f"TaskID: {task_id}\nOriginal: {user_prompt}\nStyle: {llama_style}\nPrompt: {llama_prompt}",
                 created_at=now,
                 updated_at=now,
                 is_deleted=False
@@ -398,6 +412,11 @@ def generate_music(request):
 @api_view(['POST'])
 @csrf_exempt
 @parser_classes([FlexibleJSONParser])
+@extend_schema(
+    summary="AI 음악 생성 (비동기) - 웹 페이지용",
+    description="Celery를 사용한 AI 음악 생성 (비동기 처리, task_id 반환) - 웹 페이지 템플릿에서 사용",
+    tags=['AI 음악 생성 (웹 페이지)']
+)
 def generate_music_async(request):
     """
     비동기 AI 음악 생성 API 엔드포인트 (Celery 사용)
@@ -448,6 +467,11 @@ def generate_music_async(request):
 
 
 @api_view(['GET'])
+@extend_schema(
+    summary="Celery 작업 상태 조회 - 웹 페이지용",
+    description="Celery 작업의 상태 및 결과 조회 - 웹 페이지 템플릿에서 사용",
+    tags=['작업 상태 (웹 페이지)']
+)
 def get_task_status(request, task_id):
     """
     Celery 작업 상태 조회
@@ -483,6 +507,11 @@ def get_task_status(request, task_id):
 
 
 @api_view(['GET'])
+@extend_schema(
+    summary="음악 목록 조회 (웹 페이지용)",
+    description="음악 목록 조회 (is_ai, user_id 필터링 지원) - 웹 페이지 템플릿에서 사용",
+    tags=['음악 (웹 페이지)']
+)
 def list_music(request):
     """
     음악 목록 조회
@@ -514,6 +543,11 @@ def list_music(request):
 
 
 @api_view(['GET'])
+@extend_schema(
+    summary="음악 상세 조회 (웹 페이지용)",
+    description="음악 ID로 상세 정보 조회 - 웹 페이지 템플릿에서 사용",
+    tags=['음악 (웹 페이지)']
+)
 def get_music_detail(request, music_id):
     """
     음악 상세 정보 조회
@@ -533,6 +567,11 @@ def get_music_detail(request, music_id):
 
 @api_view(['POST'])
 @csrf_exempt  # Suno API 외부 요청이므로 CSRF 제외
+@extend_schema(
+    summary="Suno 웹훅 (내부)",
+    description="Suno API가 음악 생성 완료 시 호출하는 웹훅 - 내부 시스템에서만 사용",
+    tags=['Suno 웹훅 (내부)']
+)
 def suno_webhook(request):
     """
     Suno API 콜백 엔드포인트 (즉시 응답 모드)
@@ -619,6 +658,11 @@ def suno_webhook(request):
 
 
 @api_view(['GET'])
+@extend_schema(
+    summary="Suno 작업 상태 조회 - 웹 페이지용",
+    description="Suno API 작업 상태 조회 (Polling용) - 웹 페이지 템플릿에서 사용",
+    tags=['작업 상태 (웹 페이지)']
+)
 def get_suno_task_status(request, task_id):
     """
     Suno API 작업 상태 조회

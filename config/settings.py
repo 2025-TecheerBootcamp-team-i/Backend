@@ -42,11 +42,13 @@ INSTALLED_APPS = [
     'drf_spectacular', # Swagger/OpenAPI 문서 자동 생성
     'django_celery_results', # Celery 작업 결과를 DB에 저장하기 위해 추가
     'storages', # Django 파일 스토리지 백엔드 (S3 연동)
+    'django_prometheus', # Prometheus 메트릭 노출 (모니터링)
     # Local apps
     'music', # 우리가 만든 'music' 앱 추가
 ]
 
 MIDDLEWARE = [
+    'django_prometheus.middleware.PrometheusBeforeMiddleware',  # Prometheus (맨 처음)
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # CORS 미들웨어 (최상단 근처에 위치)
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -55,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_prometheus.middleware.PrometheusAfterMiddleware',  # Prometheus (맨 마지막)
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -83,12 +86,16 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': os.getenv('SQL_ENGINE', 'django.db.backends.postgresql'),
+        # django-prometheus를 사용하여 DB 쿼리 메트릭 수집
+        'ENGINE': os.getenv('SQL_ENGINE', 'django_prometheus.db.backends.postgresql'),
         'NAME': os.getenv('SQL_DATABASE', 'music_db'),
         'USER': os.getenv('SQL_USER', 'music_user'),
         'PASSWORD': os.getenv('SQL_PASSWORD', 'music_password'),
         'HOST': os.getenv('SQL_HOST', 'db'), # docker-compose 서비스 이름
         'PORT': os.getenv('SQL_PORT', '5432'), # PostgreSQL 기본 포트
+        'OPTIONS': {
+            'sslmode': 'require',  # AWS RDS는 SSL 연결 필요
+        } if os.getenv('SQL_HOST', '').endswith('.rds.amazonaws.com') else {},
     }
 }
 
@@ -155,11 +162,11 @@ CELERY_ENABLE_UTC = False
 # ==============================================
 # REST API의 기본 인증 및 권한 설정을 정의합니다.
 REST_FRAMEWORK = {
-    # 기본 인증 방식: JWT(JSON Web Token)를 사용합니다.
-    # 클라이언트는 로그인 후 발급받은 토큰을 Authorization 헤더에 포함하여 요청합니다.
+    # 기본 인증 방식: 커스텀 JWT 인증을 사용합니다.
+    # Users 모델과 연동하여 JWT 토큰을 검증합니다.
     # 예: Authorization: Bearer <access_token>
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'music.authentication.CustomJWTAuthentication',  # 커스텀 JWT 인증
     ),
     
     # 기본 권한 정책: 모든 사용자에게 접근 허용 (인증 불필요)
@@ -269,7 +276,9 @@ AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'ap-northeast-2')
 AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN', f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com')
 
 # S3 버킷이 설정된 경우에만 S3를 기본 스토리지로 사용
-if AWS_STORAGE_BUCKET_NAME:
+# 단, DEBUG 모드에서는 로컬 정적 파일 스토리지 사용 (개발 편의성)
+if AWS_STORAGE_BUCKET_NAME and not DEBUG:
+    # 프로덕션: S3 스토리지 사용
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
     
@@ -280,5 +289,6 @@ if AWS_STORAGE_BUCKET_NAME:
     AWS_DEFAULT_ACL = 'public-read'  # 퍼블릭 읽기 허용
     AWS_QUERYSTRING_AUTH = False  # URL에 서명 불필요 (퍼블릭 파일)
 else:
-    # S3 버킷이 설정되지 않은 경우 로컬 스토리지 사용
+    # 개발 환경 또는 S3 미설정: 로컬 스토리지 사용
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'

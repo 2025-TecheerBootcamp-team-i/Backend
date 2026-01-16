@@ -1,6 +1,6 @@
 # 📁 프로젝트 파일 구조
 
-> 마지막 업데이트: 2026-01-13 (AI 음악 생성 기능 추가)
+> 마지막 업데이트: 2026-01-15 (모니터링 시스템 구축 완료)
 
 ```
 Backend/
@@ -31,11 +31,13 @@ Backend/
 │   │
 │   ├── 📂 views/            # Views 모듈 (API 엔드포인트)
 │   │   ├── __init__.py      # 모든 View export
-│   │   ├── common.py        # 공통 유틸 (MusicPagination)
+│   │   ├── common.py        # 공통 유틸 (MusicPagination, ErrorTestView, DatabaseQueryTestView)
 │   │   ├── auth.py          # 인증 관련 (Register, Login)
 │   │   ├── likes.py         # 좋아요 관련 (MusicLike)
 │   │   ├── search.py        # 검색 관련 (MusicSearch)
-│   │   └── music.py         # 음악 상세 관련 (MusicDetail)
+│   │   ├── music.py         # 음악 상세 관련 (MusicDetail)
+│   │   ├── artists.py       # 아티스트 관련 (ArtistDetail, ArtistTracks, ArtistAlbums)
+│   │   └── legacy.py        # 레거시 함수 기반 Views
 │   │
 │   ├── 📂 services/         # 외부 API 서비스
 │   │   ├── __init__.py      # 모든 Service export
@@ -69,6 +71,20 @@ Backend/
 ├── 📋 TREE.md                # 파일 구조 (현재 파일)
 ├── 📋 ITUNES_API_GUIDE.md    # iTunes API 통합 가이드
 │
+├── 📂 monitoring/            # 모니터링 시스템 설정
+│   ├── prometheus.yml        # Prometheus 설정
+│   ├── loki.yml              # Loki 설정
+│   ├── promtail.yml          # Promtail 설정
+│   ├── rabbitmq_enabled_plugins  # RabbitMQ Prometheus 플러그인
+│   └── 📂 grafana/           # Grafana 설정
+│       ├── provisioning/     # 데이터소스/대시보드 프로비저닝
+│       │   ├── datasources/datasources.yml
+│       │   └── dashboards/dashboards.yml
+│       └── dashboards/       # 대시보드 JSON 파일
+│           ├── django-metrics.json
+│           ├── system-overview.json
+│           └── rabbitmq-metrics.json
+│
 ├── 🔒 .env                   # 환경 변수 (Git 제외)
 ├── 🔒 .env.example           # 환경 변수 템플릿 (팀 공유용)
 └── 🔒 .gitignore             # Git 제외 파일 목록
@@ -82,6 +98,7 @@ Backend/
 - [x] **Phase 3-1**: iTunes API 통합 (검색 우선 구조)
 - [x] **앱 모듈화**: views/, serializers/, services/ 폴더 구조화
 - [x] **Phase 3-2-1**: AI 음악 생성 (Suno API) 및 비동기 작업 (Celery)
+- [x] **모니터링 시스템**: Prometheus, Grafana, Loki 통합 모니터링 구축
 - [ ] **Phase 3-2-2**: 외부 API (LRCLIB) 통합
 - [ ] **Phase 4**: 데이터 시각화 및 최적화 (play_log, 차트)
 - [ ] **Phase 5**: 클라우드 이관 (AWS RDS, MQ, EC2)
@@ -130,6 +147,10 @@ Backend/
 - `GET /api/v1/suno-task/{task_id}/` - Suno API 작업 상태 조회
 - `POST /api/v1/webhook/suno/` - Suno API 웹훅 (음악 생성 완료 콜백)
 
+**테스트 엔드포인트 (모니터링용)**
+- `GET /api/v1/test/error?code={500}&rate={0.5}` - 에러율 테스트
+- `GET /api/v1/test/db?count={10}&type={all|select}` - DB 쿼리 테스트
+
 **웹 페이지 (UI)**
 - `GET /music/generator/` - 음악 생성 페이지
 - `GET /music/list/` - 음악 목록 페이지
@@ -141,3 +162,16 @@ Backend/
 - ✅ `asgi.py` 생성 (비동기 지원)
 - ✅ `celery_app.py` → `config/celery.py`로 이동
 - ✅ 모든 import 경로 업데이트 (`settings` → `config.settings`)
+
+### 2026-01-15 - 모니터링 시스템 구축
+- ✅ Prometheus, Grafana, Loki 통합 모니터링 스택 구축
+- ✅ Django 메트릭 수집 (django-prometheus)
+- ✅ RabbitMQ Prometheus 플러그인 활성화
+- ✅ Grafana 대시보드 3개 자동 프로비저닝
+  - Django Application Metrics (7개 패널)
+  - System Overview (9개 패널)
+  - RabbitMQ Metrics (10개 패널)
+- ✅ 테스트 엔드포인트 추가
+  - `/api/v1/test/error` - 에러율 테스트
+  - `/api/v1/test/db` - DB 쿼리 테스트
+- ✅ 모든 대시보드 쿼리에 "No data" 방지 처리 (`or vector(0)`)

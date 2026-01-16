@@ -1,15 +1,199 @@
 """
 Celery 비동기 작업 정의
 """
+import time
 from celery import shared_task
 from django.utils import timezone
 from .models import Music, AiInfo, Users, Artists, Albums
 from .music_generate.services import LlamaService, SunoAPIService
 from .music_generate.utils import extract_genre_from_prompt
-from .utils.s3_upload import download_and_upload_to_s3, is_suno_url, is_s3_url
+from .utils.s3_upload import download_and_upload_to_s3, is_suno_url, is_s3_url, upload_image_to_s3
+from .services import WikidataService, LRCLIBService, DeezerService, LyricsOvhService
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task(bind=True)
+def test_task(self, message: str = "테스트 메시지", delay_seconds: int = 1):
+    """
+    RabbitMQ 메트릭 테스트용 간단한 작업
+    
+    Args:
+        message: 출력할 메시지
+        delay_seconds: 대기 시간 (초)
+    
+    Returns:
+        작업 완료 메시지
+    """
+    logger.info(f"테스트 작업 시작: {message}")
+    time.sleep(delay_seconds)  # 지정된 시간만큼 대기
+    logger.info(f"테스트 작업 완료: {message}")
+    return {"status": "success", "message": message, "task_id": self.request.id}
+
+
+@shared_task(bind=True, max_retries=2)
+def fetch_artist_image_task(self, artist_id: int, artist_name: str):
+    """
+    아티스트 이미지를 비동기로 조회하고 S3에 업로드 후 DB 업데이트
+    
+    API 호출 순서 (fallback 체인):
+    1. Wikidata API (1차)
+    2. Deezer API (2차 fallback)
+    
+    이미지 처리:
+    1. 외부 API에서 이미지 URL 조회
+    2. S3에 업로드 (media/images/artists/original/)
+    3. Lambda가 자동으로 리사이징 (원형 228x228, 208x208 / 사각형 220x220)
+    4. DB에 S3 URL 저장
+    
+    Args:
+        artist_id: Artist 모델의 ID
+        artist_name: 아티스트 이름
+        
+    Returns:
+        S3 이미지 URL 또는 None
+    """
+    try:
+        logger.info(f"[아티스트 이미지] 조회 시작: artist_id={artist_id}, name={artist_name}")
+        
+        # Artist 객체 조회
+        try:
+            artist = Artists.objects.get(artist_id=artist_id, is_deleted=False)
+        except Artists.DoesNotExist:
+            logger.error(f"[아티스트 이미지] Artist를 찾을 수 없음: artist_id={artist_id}")
+            return None
+        
+        # 이미 S3 이미지가 있으면 스킵
+        if artist.artist_image and artist.artist_image.strip():
+            if is_s3_url(artist.artist_image):
+                logger.info(f"[아티스트 이미지] 이미 S3 이미지가 있음: artist_id={artist_id}")
+                return artist.artist_image
+            # S3 URL이 아니면 새로 업로드 진행
+            logger.info(f"[아티스트 이미지] 기존 URL이 S3가 아님, S3로 업로드 진행: artist_id={artist_id}")
+        
+        image_url = None
+        source = None
+        
+        # 1차: Wikidata에서 이미지 조회
+        image_url = WikidataService.fetch_artist_image(artist_name)
+        if image_url:
+            source = "Wikidata"
+        
+        # 2차 fallback: Deezer에서 이미지 조회
+        if not image_url:
+            logger.info(f"[아티스트 이미지] Wikidata 실패, Deezer fallback 시도: {artist_name}")
+            image_url = DeezerService.fetch_artist_image(artist_name)
+            if image_url:
+                source = "Deezer"
+        
+        if image_url:
+            # S3에 이미지 업로드 (Lambda가 자동으로 리사이징)
+            try:
+                s3_url = upload_image_to_s3(
+                    image_url=image_url,
+                    image_type='artists',
+                    entity_id=artist_id,
+                    entity_name=artist_name
+                )
+                logger.info(f"[아티스트 이미지] S3 업로드 완료 ({source}): artist_id={artist_id}")
+                
+                # DB 업데이트 (S3 URL 저장)
+                artist.artist_image = s3_url
+                artist.updated_at = timezone.now()
+                artist.save()
+                logger.info(f"[아티스트 이미지] DB 저장 완료: artist_id={artist_id}, url={s3_url[:80]}...")
+                return s3_url
+                
+            except Exception as upload_error:
+                # S3 업로드 실패 시 원본 URL이라도 저장
+                logger.warning(f"[아티스트 이미지] S3 업로드 실패, 원본 URL 저장: {upload_error}")
+                artist.artist_image = image_url
+                artist.updated_at = timezone.now()
+                artist.save()
+                logger.info(f"[아티스트 이미지] 원본 URL 저장 완료 ({source}): artist_id={artist_id}")
+                return image_url
+        else:
+            logger.info(f"[아티스트 이미지] 모든 API에서 이미지를 찾지 못함: artist_id={artist_id}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"[아티스트 이미지] 실패: artist_id={artist_id}, 오류: {e}")
+        
+        if self.request.retries < self.max_retries:
+            logger.info(f"[아티스트 이미지] 재시도: {self.request.retries + 1}/{self.max_retries}")
+            raise self.retry(exc=e, countdown=30)
+        
+        return None
+
+
+@shared_task(bind=True, max_retries=2)
+def fetch_lyrics_task(self, music_id: int, artist_name: str, track_name: str, duration: int = None):
+    """
+    가사를 비동기로 조회하고 DB 업데이트
+    
+    API 호출 순서 (fallback 체인):
+    1. LRCLIB API (1차) - 동기화된 LRC 가사 지원
+    2. lyrics.ovh API (2차 fallback) - 일반 텍스트 가사
+    
+    Args:
+        music_id: Music 모델의 ID
+        artist_name: 아티스트 이름
+        track_name: 곡 이름
+        duration: 곡 길이 (초 단위)
+        
+    Returns:
+        가사 문자열 또는 None
+    """
+    try:
+        logger.info(f"[가사 조회] 시작: music_id={music_id}, {artist_name} - {track_name}")
+        
+        # Music 객체 조회
+        try:
+            music = Music.objects.get(music_id=music_id, is_deleted=False)
+        except Music.DoesNotExist:
+            logger.error(f"[가사 조회] Music을 찾을 수 없음: music_id={music_id}")
+            return None
+        
+        # 이미 가사가 있으면 스킵
+        if music.lyrics and music.lyrics.strip():
+            logger.info(f"[가사 조회] 이미 가사가 있음: music_id={music_id}")
+            return music.lyrics
+        
+        lyrics = None
+        source = None
+        
+        # 1차: LRCLIB에서 가사 조회 (동기화된 LRC 가사 우선)
+        lyrics = LRCLIBService.fetch_lyrics(artist_name, track_name, duration)
+        if lyrics:
+            source = "LRCLIB"
+        
+        # 2차 fallback: lyrics.ovh에서 가사 조회
+        if not lyrics:
+            logger.info(f"[가사 조회] LRCLIB 실패, lyrics.ovh fallback 시도: {artist_name} - {track_name}")
+            lyrics = LyricsOvhService.fetch_lyrics(artist_name, track_name)
+            if lyrics:
+                source = "lyrics.ovh"
+        
+        if lyrics:
+            # DB 업데이트
+            music.lyrics = lyrics
+            music.updated_at = timezone.now()
+            music.save()
+            logger.info(f"[가사 조회] 저장 완료 ({source}): music_id={music_id}, 길이={len(lyrics)}")
+            return lyrics
+        else:
+            logger.info(f"[가사 조회] 모든 API에서 가사를 찾지 못함: music_id={music_id}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"[가사 조회] 실패: music_id={music_id}, 오류: {e}")
+        
+        if self.request.retries < self.max_retries:
+            logger.info(f"[가사 조회] 재시도: {self.request.retries + 1}/{self.max_retries}")
+            raise self.retry(exc=e, countdown=30)
+        
+        return None
 
 
 @shared_task(bind=True, max_retries=3)
@@ -94,6 +278,9 @@ def generate_music_task(self, user_prompt: str, user_id: int = None, make_instru
             music_result.get('data', {}).get('image_url')
         )
         
+        # task_id 추출 (Webhook에서 사용)
+        task_id = music_result.get('taskId') or music_result.get('task_id') or 'unknown'
+        
         # 4. Artists 모델에 저장
         artist = Artists.objects.create(
             artist_name=artist_name,
@@ -132,9 +319,11 @@ def generate_music_task(self, user_prompt: str, user_id: int = None, make_instru
         )
         
         # 7. AiInfo 모델에 프롬프트 정보 저장
+        # task_id 필드를 직접 설정해야 webhook 태스크에서 찾을 수 있음
         ai_info = AiInfo.objects.create(
             music=music,
-            input_prompt=f"Original: {user_prompt}\nConverted: {english_prompt}",
+            task_id=task_id,  # Webhook 태스크에서 이 필드로 검색함
+            input_prompt=f"TaskID: {task_id}\nOriginal: {user_prompt}\nConverted: {english_prompt}",
             created_at=now,
             updated_at=now,
             is_deleted=False
@@ -401,11 +590,15 @@ def process_suno_webhook_task(self, webhook_data: dict):
         # Music 업데이트
         now = timezone.now()
         
-        # 제목: Suno가 제공한 제목을 최종으로 사용
-        # generate_music 단계에서 임시로 저장된 제목이 있어도 Suno 제목으로 덮어쓴다.
-        if title:
+        # 제목: Suno가 생성한 제목 사용 (유효한 제목인 경우에만)
+        # 'AI Generated Song' 등의 기본값은 무시
+        invalid_titles = ['AI Generated Song', 'Untitled', 'Unknown', '', None]
+        if title and title not in invalid_titles:
+            old_title = music.music_name
             music.music_name = title
-            logger.info(f"[Webhook 태스크] 제목 업데이트 (Suno 최종): {title}")
+            logger.info(f"[Webhook 태스크] 제목 업데이트 (Suno 제목): {old_title} → {title}")
+        else:
+            logger.info(f"[Webhook 태스크] 제목 유지 (Suno 제목 무효): {music.music_name}")
         
         # audio_url: S3 URL이 아닐 때만 업데이트
         if audio_url and not is_s3_url(music.audio_url):
@@ -442,8 +635,10 @@ def process_suno_webhook_task(self, webhook_data: dict):
             except Exception as e:
                 logger.error(f"[Webhook 태스크] S3 업로드 태스크 호출 실패: {e}")
         
-        # 타임스탬프 가사 조회 태스크 호출
-        if audio_url and task_id and callback_type in ['first', 'complete'] and not music.is_instrumental:
+        # 타임스탬프 가사 조회 태스크 호출 (가사가 있는 경우에만)
+        # is_instrumental 필드가 Music 모델에 없으므로, 가사 존재 여부로 판단
+        has_vocals = lyrics and len(lyrics) > 50  # 가사가 50자 이상이면 vocal 곡으로 간주
+        if audio_url and task_id and callback_type in ['first', 'complete'] and has_vocals:
             try:
                 logger.info(f"[Webhook 태스크] 타임스탬프 가사 조회 태스크 호출")
                 fetch_timestamped_lyrics_task.delay(music.music_id, task_id, audio_id)
@@ -489,3 +684,126 @@ def process_suno_webhook_task(self, webhook_data: dict):
         
         logger.error(f"[Webhook 태스크] 최대 재시도 횟수 초과")
         return {"status": "error", "message": str(e)}
+
+
+@shared_task(bind=True, max_retries=3)
+def save_itunes_track_to_db_task(self, itunes_data: dict):
+    """
+    iTunes 곡을 DB에 저장하는 백그라운드 태스크 (방안 2: 비동기 DB 저장)
+    
+    **목적:**
+    - 상세 조회 API에서 즉시 응답하기 위해 DB 저장을 백그라운드로 처리
+    - 응답 시간 50-200ms 절약 (DB 저장 시간)
+    
+    **동작 흐름:**
+    1. 상세 조회 API: iTunes API 호출 → 파싱 → 이 태스크 호출(.delay()) → 즉시 응답 (202 Accepted)
+    2. Celery 워커: 이 태스크를 백그라운드에서 실행 → DB 저장
+    3. 사용자: 대기 없이 음악 재생 가능
+    
+    **중복 방지:**
+    - DB에 이미 같은 itunes_id가 있으면 저장하지 않음
+    
+    **재시도:**
+    - 실패 시 최대 3번까지 재시도 (10초 간격)
+    
+    Args:
+        self: Celery task 인스턴스
+        itunes_data: iTunes API에서 파싱된 데이터
+            {
+                'itunes_id': int,
+                'music_name': str,
+                'artist_name': str,
+                'album_name': str,
+                'genre': str,
+                'duration': int,
+                'audio_url': str,
+                ...
+            }
+        
+    Returns:
+        저장된 music_id (성공 시) 또는 None (실패 시)
+    """
+    from django.db import transaction
+    
+    try:
+        itunes_id = itunes_data.get('itunes_id')
+        
+        # iTunes ID 검증
+        if not itunes_id:
+            logger.error("[iTunes 저장] itunes_id가 없습니다.")
+            return None
+        
+        # 중복 확인: 이미 DB에 있으면 저장하지 않음
+        if Music.objects.filter(itunes_id=itunes_id, is_deleted=False).exists():
+            logger.info(f"[iTunes 저장] 이미 DB에 존재 (중복 방지): itunes_id={itunes_id}")
+            existing_music = Music.objects.get(itunes_id=itunes_id, is_deleted=False)
+            return existing_music.music_id
+        
+        logger.info(f"[iTunes 저장] 시작: itunes_id={itunes_id}, music_name={itunes_data.get('music_name')}")
+        
+        now = timezone.now()
+        
+        # 트랜잭션으로 묶어서 전체 저장 성공 또는 전체 실패 보장
+        with transaction.atomic():
+            # Artist 생성 또는 조회
+            # - 같은 이름의 아티스트가 있으면 재사용
+            # - 없으면 새로 생성
+            artist = None
+            artist_name = itunes_data.get('artist_name', '')
+            if artist_name:
+                artist, created = Artists.objects.get_or_create(
+                    artist_name=artist_name,
+                    defaults={
+                        'artist_image': itunes_data.get('artist_image', ''),
+                        'created_at': now,
+                        'is_deleted': False,
+                    }
+                )
+                if created:
+                    logger.info(f"[iTunes 저장] Artist 생성: {artist_name}")
+            
+            # Album 생성 또는 조회
+            # - 같은 아티스트의 같은 앨범이 있으면 재사용
+            # - 없으면 새로 생성
+            album = None
+            album_name = itunes_data.get('album_name', '')
+            if album_name and artist:
+                album, created = Albums.objects.get_or_create(
+                    album_name=album_name,
+                    artist=artist,
+                    defaults={
+                        'album_image': itunes_data.get('album_image', ''),
+                        'created_at': now,
+                        'is_deleted': False,
+                    }
+                )
+                if created:
+                    logger.info(f"[iTunes 저장] Album 생성: {album_name}")
+            
+            # Music 생성
+            music = Music.objects.create(
+                itunes_id=itunes_id,
+                music_name=itunes_data.get('music_name', ''),
+                artist=artist,
+                album=album,
+                genre=itunes_data.get('genre', ''),
+                duration=itunes_data.get('duration'),
+                audio_url=itunes_data.get('audio_url', ''),
+                is_ai=False,  # iTunes 곡은 AI 생성곡이 아님
+                created_at=now,
+                is_deleted=False,
+            )
+            
+            logger.info(f"[iTunes 저장] 완료: music_id={music.music_id}, itunes_id={itunes_id}")
+            return music.music_id
+        
+    except Exception as e:
+        logger.error(f"[iTunes 저장] 실패: itunes_id={itunes_data.get('itunes_id')}, 오류: {e}")
+        
+        # 재시도 로직 (최대 3번)
+        if self.request.retries < self.max_retries:
+            logger.info(f"[iTunes 저장] 재시도 예약: {self.request.retries + 1}/{self.max_retries}")
+            raise self.retry(exc=e, countdown=10)  # 10초 후 재시도
+        
+        logger.error(f"[iTunes 저장] 최대 재시도 횟수 초과 - 저장 실패")
+        return None
