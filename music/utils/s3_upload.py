@@ -189,7 +189,7 @@ def upload_image_to_s3(
     
     Args:
         image_url: 다운로드할 이미지 URL
-        image_type: 이미지 타입 ('artists', 'albums', 'tracks')
+        image_type: 이미지 타입 ('artists', 'albums')
         entity_id: 엔티티 ID (아티스트/앨범/트랙 ID)
         entity_name: 엔티티 이름 (파일명에 사용, 없으면 ID만 사용)
         
@@ -208,9 +208,12 @@ def upload_image_to_s3(
         raise ValueError("AWS_ACCESS_KEY_ID 또는 AWS_SECRET_ACCESS_KEY가 설정되지 않았습니다.")
     
     try:
-        # 이미지 다운로드
+        # 이미지 다운로드 (Wikipedia 403 에러 방지를 위해 User-Agent 추가)
         logger.info(f"[S3 이미지] 다운로드 시작: {image_url[:80]}...")
-        response = requests.get(image_url, timeout=30)
+        headers = {
+            'User-Agent': 'MusicStreamingApp/1.0 (contact@musicapp.com)'
+        }
+        response = requests.get(image_url, timeout=30, headers=headers)
         response.raise_for_status()
         image_content = response.content
         logger.info(f"[S3 이미지] 다운로드 완료: {len(image_content)} bytes")
@@ -258,14 +261,48 @@ def upload_image_to_s3(
             CacheControl='max-age=31536000'  # 1년 캐시
         )
         
-        # S3 URL 생성
-        if hasattr(settings, 'AWS_S3_CUSTOM_DOMAIN') and settings.AWS_S3_CUSTOM_DOMAIN:
-            s3_url = f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{s3_key}'
-        else:
-            s3_url = f'https://{settings.AWS_STORAGE_BUCKET_NAME}.s3.{settings.AWS_S3_REGION_NAME}.amazonaws.com/{s3_key}'
+        # S3 URL 생성 헬퍼 함수
+        def get_s3_url(key: str) -> str:
+            if hasattr(settings, 'AWS_S3_CUSTOM_DOMAIN') and settings.AWS_S3_CUSTOM_DOMAIN:
+                return f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{key}'
+            else:
+                return f'https://{settings.AWS_STORAGE_BUCKET_NAME}.s3.{settings.AWS_S3_REGION_NAME}.amazonaws.com/{key}'
         
-        logger.info(f"[S3 이미지] 업로드 완료: {s3_url}")
-        return s3_url
+        original_url = get_s3_url(s3_key)
+        logger.info(f"[S3 이미지] 업로드 완료: {original_url}")
+        
+        # 리사이징된 이미지 URL 생성 (Lambda가 생성할 경로)
+        resized_urls = {}
+        if image_type == 'artists':
+            # 파일명에서 확장자 추출 및 변경
+            filename_without_ext = file_name.rsplit('.', 1)[0]
+            
+            # 원형 이미지 URL (PNG)
+            large_circle_key = f"media/images/artists/circular/228x228/{filename_without_ext}.png"
+            small_circle_key = f"media/images/artists/circular/208x208/{filename_without_ext}.png"
+            
+            # 사각형 이미지 URL (JPEG)
+            square_key = f"media/images/artists/square/220x220/{filename_without_ext}.jpg"
+            
+            resized_urls = {
+                'original': original_url,
+                'image_large_circle': get_s3_url(large_circle_key),
+                'image_small_circle': get_s3_url(small_circle_key),
+                'image_square': get_s3_url(square_key),
+            }
+        elif image_type == 'albums':
+            # 파일명에서 확장자 추출 및 변경
+            filename_without_ext = file_name.rsplit('.', 1)[0]
+            
+            # 사각형 이미지 URL (JPEG)
+            square_key = f"media/images/albums/square/220x220/{filename_without_ext}.jpg"
+            
+            resized_urls = {
+                'original': original_url,
+                'image_square': get_s3_url(square_key),
+            }
+        
+        return resized_urls
         
     except requests.RequestException as e:
         logger.error(f"[S3 이미지] 다운로드 실패: {image_url}, 오류: {e}")

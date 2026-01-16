@@ -193,3 +193,55 @@
      - fetch_album_image_task (비동기, 필요시)
 
 모든 이미지 처리는 비동기로 진행되므로 API 응답은 빠르게 반환됩니다.
+
+---
+
+## 🧪 실제 테스트 결과 (2026-01-17)
+
+### 테스트 시나리오: DB에 없는 아티스트 "boy pablo" 검색
+
+#### 1단계: 검색 (`GET /api/v1/search?q=boy pablo`)
+- ✅ iTunes Search API 호출 성공
+- ✅ 아티스트 생성 (artist_id: 3729)
+- ✅ 앨범 생성 (album_id: 6528, 6529, 6530, ...)
+- ✅ `fetch_artist_image_task` 호출 (비동기)
+- ✅ `fetch_album_image_task` 호출 (비동기)
+
+#### 2단계: 아티스트 이미지 수집 (비동기)
+- ✅ Wikidata에서 이미지 URL 조회
+- ✅ S3 업로드 (User-Agent 헤더 추가로 403 에러 해결)
+- ✅ DB 저장:
+  - `artist_image`: S3 원본 URL
+  - `image_large_circle`: S3 228x228 URL
+  - `image_small_circle`: S3 208x208 URL
+  - `image_square`: S3 220x220 URL
+
+#### 3단계: 곡 클릭 (`GET /api/v1/tracks/1234864149`)
+- ✅ iTunes Lookup API 호출 성공
+- ✅ `save_itunes_track_to_db_task` 호출 (비동기)
+- ✅ Music 생성 (music_id: 8583)
+- ✅ 기존 아티스트 재사용 (artist_id: 3729)
+- ✅ 기존 앨범 재사용 (album_id: 6528)
+
+### 발견된 문제 및 해결
+1. **Wikipedia 403 Forbidden 에러**
+   - **원인**: User-Agent 헤더 없이 Wikipedia 이미지 다운로드 시도
+   - **해결**: `music/utils/s3_upload.py`에 User-Agent 헤더 추가
+
+### 최종 DB 상태
+```
+Artist: boy pablo (ID: 3729)
+  - artist_image: S3 URL ✅
+  - image_large_circle: S3 URL ✅
+  - image_small_circle: S3 URL ✅
+  - image_square: S3 URL ✅
+
+Album: Roy Pablo - EP (ID: 6528)
+  - album_image: S3 URL ✅
+  - image_square: S3 URL ✅
+
+Music: Everytime (ID: 8583)
+  - itunes_id: 1234864149 ✅
+  - artist: boy pablo ✅
+  - album: Roy Pablo - EP ✅
+```
