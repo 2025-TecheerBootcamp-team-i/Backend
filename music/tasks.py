@@ -90,7 +90,7 @@ def fetch_artist_image_task(self, artist_id: int, artist_name: str):
         if image_url:
             # S3에 이미지 업로드 (Lambda가 자동으로 리사이징)
             try:
-                s3_url = upload_image_to_s3(
+                resized_urls = upload_image_to_s3(
                     image_url=image_url,
                     image_type='artists',
                     entity_id=artist_id,
@@ -98,12 +98,19 @@ def fetch_artist_image_task(self, artist_id: int, artist_name: str):
                 )
                 logger.info(f"[아티스트 이미지] S3 업로드 완료 ({source}): artist_id={artist_id}")
                 
-                # DB 업데이트 (S3 URL 저장)
-                artist.artist_image = s3_url
+                # DB 업데이트 (원본 + 리사이징된 이미지 URL 저장)
+                artist.artist_image = resized_urls.get('original')
+                artist.image_large_circle = resized_urls.get('image_large_circle')  # 228x228
+                artist.image_small_circle = resized_urls.get('image_small_circle')  # 208x208
+                artist.image_square = resized_urls.get('image_square')  # 220x220
                 artist.updated_at = timezone.now()
                 artist.save()
-                logger.info(f"[아티스트 이미지] DB 저장 완료: artist_id={artist_id}, url={s3_url[:80]}...")
-                return s3_url
+                logger.info(f"[아티스트 이미지] DB 저장 완료: artist_id={artist_id}")
+                logger.info(f"  - 원본: {resized_urls.get('original', '')[:60]}...")
+                logger.info(f"  - 큰 원: {resized_urls.get('image_large_circle', '')[:60]}...")
+                logger.info(f"  - 작은 원: {resized_urls.get('image_small_circle', '')[:60]}...")
+                logger.info(f"  - 사각형: {resized_urls.get('image_square', '')[:60]}...")
+                return resized_urls.get('original')
                 
             except Exception as upload_error:
                 # S3 업로드 실패 시 원본 URL이라도 저장
@@ -122,6 +129,86 @@ def fetch_artist_image_task(self, artist_id: int, artist_name: str):
         
         if self.request.retries < self.max_retries:
             logger.info(f"[아티스트 이미지] 재시도: {self.request.retries + 1}/{self.max_retries}")
+            raise self.retry(exc=e, countdown=30)
+        
+        return None
+
+
+@shared_task(bind=True, max_retries=2)
+def fetch_album_image_task(self, album_id: int, album_name: str, album_image_url: str):
+    """
+    앨범 이미지를 S3에 업로드하고 리사이징된 URL을 DB에 저장
+    
+    이미지 처리:
+    1. 외부 URL에서 이미지 다운로드
+    2. S3에 업로드 (media/images/albums/original/)
+    3. Lambda가 자동으로 리사이징 (사각형 220x220)
+    4. DB에 원본 + 리사이징된 URL 저장
+    
+    Args:
+        album_id: Album 모델의 ID
+        album_name: 앨범 이름
+        album_image_url: 앨범 이미지 URL
+        
+    Returns:
+        S3 이미지 URL 또는 None
+    """
+    try:
+        logger.info(f"[앨범 이미지] 업로드 시작: album_id={album_id}, name={album_name}")
+        
+        # Album 객체 조회
+        try:
+            album = Albums.objects.get(album_id=album_id, is_deleted=False)
+        except Albums.DoesNotExist:
+            logger.error(f"[앨범 이미지] Album을 찾을 수 없음: album_id={album_id}")
+            return None
+        
+        # 이미 S3 이미지가 있으면 스킵
+        if album.album_image and album.album_image.strip():
+            if is_s3_url(album.album_image):
+                logger.info(f"[앨범 이미지] 이미 S3 이미지가 있음: album_id={album_id}")
+                return album.album_image
+            # S3 URL이 아니면 새로 업로드 진행
+            logger.info(f"[앨범 이미지] 기존 URL이 S3가 아님, S3로 업로드 진행: album_id={album_id}")
+        
+        if not album_image_url:
+            logger.info(f"[앨범 이미지] 이미지 URL이 없음: album_id={album_id}")
+            return None
+        
+        # S3에 이미지 업로드 (Lambda가 자동으로 리사이징)
+        try:
+            resized_urls = upload_image_to_s3(
+                image_url=album_image_url,
+                image_type='albums',
+                entity_id=album_id,
+                entity_name=album_name
+            )
+            logger.info(f"[앨범 이미지] S3 업로드 완료: album_id={album_id}")
+            
+            # DB 업데이트 (원본 + 리사이징된 이미지 URL 저장)
+            album.album_image = resized_urls.get('original')
+            album.image_square = resized_urls.get('image_square')  # 220x220
+            album.updated_at = timezone.now()
+            album.save()
+            logger.info(f"[앨범 이미지] DB 저장 완료: album_id={album_id}")
+            logger.info(f"  - 원본: {resized_urls.get('original', '')[:60]}...")
+            logger.info(f"  - 사각형: {resized_urls.get('image_square', '')[:60]}...")
+            return resized_urls.get('original')
+            
+        except Exception as upload_error:
+            # S3 업로드 실패 시 원본 URL이라도 저장
+            logger.warning(f"[앨범 이미지] S3 업로드 실패, 원본 URL 저장: {upload_error}")
+            album.album_image = album_image_url
+            album.updated_at = timezone.now()
+            album.save()
+            logger.info(f"[앨범 이미지] 원본 URL 저장 완료: album_id={album_id}")
+            return album_image_url
+            
+    except Exception as e:
+        logger.error(f"[앨범 이미지] 실패: album_id={album_id}, 오류: {e}")
+        
+        if self.request.retries < self.max_retries:
+            logger.info(f"[앨범 이미지] 재시도: {self.request.retries + 1}/{self.max_retries}")
             raise self.retry(exc=e, countdown=30)
         
         return None
@@ -754,13 +841,20 @@ def save_itunes_track_to_db_task(self, itunes_data: dict):
                 artist, created = Artists.objects.get_or_create(
                     artist_name=artist_name,
                     defaults={
-                        'artist_image': itunes_data.get('artist_image', ''),
+                        'artist_image': '',  # 비동기로 수집
                         'created_at': now,
                         'is_deleted': False,
                     }
                 )
                 if created:
                     logger.info(f"[iTunes 저장] Artist 생성: {artist_name}")
+                
+                # 아티스트 이미지 비동기 수집 (새로 생성되었거나 이미지가 없는 경우)
+                if created or not artist.artist_image:
+                    try:
+                        fetch_artist_image_task.delay(artist.artist_id, artist_name)
+                    except Exception as e:
+                        logger.warning(f"[iTunes 저장] 아티스트 이미지 태스크 호출 실패: {e}")
             
             # Album 생성 또는 조회
             # - 같은 아티스트의 같은 앨범이 있으면 재사용
@@ -772,13 +866,21 @@ def save_itunes_track_to_db_task(self, itunes_data: dict):
                     album_name=album_name,
                     artist=artist,
                     defaults={
-                        'album_image': itunes_data.get('album_image', ''),
+                        'album_image': '',  # 비동기로 수집
                         'created_at': now,
                         'is_deleted': False,
                     }
                 )
                 if created:
                     logger.info(f"[iTunes 저장] Album 생성: {album_name}")
+                
+                # 앨범 이미지 비동기 수집 (새로 생성되었거나 이미지가 없는 경우)
+                album_image_url = itunes_data.get('album_image', '')
+                if album_image_url and (created or not album.album_image):
+                    try:
+                        fetch_album_image_task.delay(album.album_id, album_name, album_image_url)
+                    except Exception as e:
+                        logger.warning(f"[iTunes 저장] 앨범 이미지 태스크 호출 실패: {e}")
             
             # Music 생성
             music = Music.objects.create(
