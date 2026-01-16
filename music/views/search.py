@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
-from ..models import Music, MusicTags, Tags
+from ..models import Music, MusicTags, Tags, Artists, Albums
 from ..serializers import iTunesSearchResultSerializer
 from ..services import iTunesService
 from .common import MusicPagination
@@ -177,9 +177,33 @@ class MusicSearchView(APIView):
             
             existing_set = set(existing_music)
             
+            # 아티스트 이름으로 DB에서 아티스트 ID 조회 (일괄 처리)
+            artist_names = [r.get('artist_name') for r in parsed_results if r.get('artist_name')]
+            artist_name_to_id = {}
+            if artist_names:
+                artists = Artists.objects.filter(
+                    artist_name__in=artist_names,
+                    is_deleted__in=[False, None]
+                ).values('artist_id', 'artist_name')
+                artist_name_to_id = {a['artist_name']: a['artist_id'] for a in artists}
+            
+            # 앨범 이름으로 DB에서 앨범 ID 조회 (일괄 처리)
+            album_names = [r.get('album_name') for r in parsed_results if r.get('album_name')]
+            album_name_to_id = {}
+            if album_names:
+                albums = Albums.objects.filter(
+                    album_name__in=album_names,
+                    is_deleted__in=[False, None]
+                ).values('album_id', 'album_name')
+                album_name_to_id = {a['album_name']: a['album_id'] for a in albums}
+            
             for item in parsed_results:
                 item['in_db'] = item.get('itunes_id') in existing_set
                 item['has_matching_tags'] = False  # 기본값
+                # 아티스트 ID 추가 (DB에 있으면)
+                item['artist_id'] = artist_name_to_id.get(item.get('artist_name'))
+                # 앨범 ID 추가 (DB에 있으면)
+                item['album_id'] = album_name_to_id.get(item.get('album_name'))
             
             results = parsed_results
         
@@ -224,7 +248,9 @@ class MusicSearchView(APIView):
                         'itunes_id': music.itunes_id,
                         'music_name': music.music_name,
                         'artist_name': music.artist.artist_name if music.artist else '',
+                        'artist_id': music.artist.artist_id if music.artist else None,
                         'album_name': music.album.album_name if music.album else '',
+                        'album_id': music.album.album_id if music.album else None,
                         'genre': music.genre or '',
                         'duration': music.duration,
                         'audio_url': music.audio_url,
