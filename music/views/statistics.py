@@ -5,6 +5,8 @@ import logging
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 
 from music.services.user_statistics import UserStatisticsService
 from music.serializers.statistics import (
@@ -19,6 +21,7 @@ from music.serializers.statistics import (
 logger = logging.getLogger(__name__)
 
 
+@extend_schema(tags=['사용자 통계'])
 class UserStatisticsView(APIView):
     """
     사용자 개인 음악 분석 데이터 API
@@ -28,6 +31,25 @@ class UserStatisticsView(APIView):
     GET /api/users/{user_id}/statistics/?period=all    (전체)
     """
     
+    @extend_schema(
+        summary="사용자 전체 음악 통계 조회",
+        description="사용자의 청취 시간, Top 장르, Top 아티스트, Top 태그, AI 생성 활동 등 전체 통계를 반환합니다.",
+        parameters=[
+            OpenApiParameter(
+                name='period',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='조회 기간: "month" (이번 달, 기본값) 또는 "all" (전체)',
+                required=False,
+                default='month',
+                examples=[
+                    OpenApiExample(name='이번 달', value='month'),
+                    OpenApiExample(name='전체 기간', value='all'),
+                ]
+            )
+        ],
+        responses={200: UserStatisticsSerializer}
+    )
     def get(self, request, user_id: int):
         """
         사용자의 전체 음악 통계를 반환합니다.
@@ -83,6 +105,7 @@ class UserStatisticsView(APIView):
             )
 
 
+@extend_schema(tags=['사용자 통계'])
 class UserListeningTimeView(APIView):
     """
     사용자 청취 시간 통계 API
@@ -90,6 +113,25 @@ class UserListeningTimeView(APIView):
     GET /api/users/{user_id}/statistics/listening-time/
     """
     
+    @extend_schema(
+        summary="사용자 청취 시간 통계 조회",
+        description="사용자의 총 청취 시간, 재생 횟수, 전월 대비 변화율을 반환합니다.",
+        parameters=[
+            OpenApiParameter(
+                name='period',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='조회 기간: "month" (이번 달, 기본값) 또는 "all" (전체)',
+                required=False,
+                default='month',
+                examples=[
+                    OpenApiExample(name='이번 달', value='month'),
+                    OpenApiExample(name='전체 기간', value='all'),
+                ]
+            )
+        ],
+        responses={200: ListeningTimeSerializer}
+    )
     def get(self, request, user_id: int):
         period = request.query_params.get('period', 'month')
         
@@ -105,6 +147,7 @@ class UserListeningTimeView(APIView):
             )
 
 
+@extend_schema(tags=['사용자 통계'])
 class UserTopGenresView(APIView):
     """
     사용자 Top 장르 통계 API
@@ -112,6 +155,33 @@ class UserTopGenresView(APIView):
     GET /api/users/{user_id}/statistics/genres/
     """
     
+    @extend_schema(
+        summary="사용자 Top 장르 통계 조회",
+        description="사용자가 가장 많이 들은 장르 목록을 재생 횟수 순으로 반환합니다.",
+        parameters=[
+            OpenApiParameter(
+                name='period',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='조회 기간: "month" (이번 달, 기본값) 또는 "all" (전체)',
+                required=False,
+                default='month',
+                examples=[
+                    OpenApiExample(name='이번 달', value='month'),
+                    OpenApiExample(name='전체 기간', value='all'),
+                ]
+            ),
+            OpenApiParameter(
+                name='limit',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='반환할 Top 장르 수 (기본값: 3)',
+                required=False,
+                default=3
+            )
+        ],
+        responses={200: GenreStatSerializer(many=True)}
+    )
     def get(self, request, user_id: int):
         period = request.query_params.get('period', 'month')
         limit = int(request.query_params.get('limit', 3))
@@ -128,6 +198,7 @@ class UserTopGenresView(APIView):
             )
 
 
+@extend_schema(tags=['사용자 통계'])
 class UserTopArtistsView(APIView):
     """
     사용자 Top 아티스트 통계 API
@@ -135,6 +206,33 @@ class UserTopArtistsView(APIView):
     GET /api/users/{user_id}/statistics/artists/
     """
     
+    @extend_schema(
+        summary="사용자 Top 아티스트 통계 조회",
+        description="사용자가 가장 많이 들은 아티스트 목록을 재생 횟수 순으로 반환합니다.",
+        parameters=[
+            OpenApiParameter(
+                name='period',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='조회 기간: "month" (이번 달, 기본값) 또는 "all" (전체)',
+                required=False,
+                default='month',
+                examples=[
+                    OpenApiExample(name='이번 달', value='month'),
+                    OpenApiExample(name='전체 기간', value='all'),
+                ]
+            ),
+            OpenApiParameter(
+                name='limit',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='반환할 Top 아티스트 수 (기본값: 3)',
+                required=False,
+                default=3
+            )
+        ],
+        responses={200: ArtistStatSerializer(many=True)}
+    )
     def get(self, request, user_id: int):
         period = request.query_params.get('period', 'month')
         limit = int(request.query_params.get('limit', 3))
@@ -151,6 +249,7 @@ class UserTopArtistsView(APIView):
             )
 
 
+@extend_schema(tags=['사용자 통계'])
 class UserTopTagsView(APIView):
     """
     사용자 Top 태그(분위기/키워드) 통계 API
@@ -158,6 +257,33 @@ class UserTopTagsView(APIView):
     GET /api/users/{user_id}/statistics/tags/
     """
     
+    @extend_schema(
+        summary="사용자 Top 태그/키워드 통계 조회",
+        description="사용자가 가장 많이 들은 태그(분위기/키워드) 목록을 재생 횟수 순으로 반환합니다.",
+        parameters=[
+            OpenApiParameter(
+                name='period',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='조회 기간: "month" (이번 달, 기본값) 또는 "all" (전체)',
+                required=False,
+                default='month',
+                examples=[
+                    OpenApiExample(name='이번 달', value='month'),
+                    OpenApiExample(name='전체 기간', value='all'),
+                ]
+            ),
+            OpenApiParameter(
+                name='limit',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='반환할 Top 태그 수 (기본값: 6)',
+                required=False,
+                default=6
+            )
+        ],
+        responses={200: TagStatSerializer(many=True)}
+    )
     def get(self, request, user_id: int):
         period = request.query_params.get('period', 'month')
         limit = int(request.query_params.get('limit', 6))
@@ -174,6 +300,7 @@ class UserTopTagsView(APIView):
             )
 
 
+@extend_schema(tags=['사용자 통계'])
 class UserAIGenerationView(APIView):
     """
     사용자 AI 생성 활동 통계 API
@@ -181,6 +308,25 @@ class UserAIGenerationView(APIView):
     GET /api/users/{user_id}/statistics/ai-generation/
     """
     
+    @extend_schema(
+        summary="사용자 AI 음악 생성 활동 통계 조회",
+        description="사용자가 AI로 생성한 음악의 총 개수와 마지막 생성 시점을 반환합니다.",
+        parameters=[
+            OpenApiParameter(
+                name='period',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='조회 기간: "month" (이번 달, 기본값) 또는 "all" (전체)',
+                required=False,
+                default='month',
+                examples=[
+                    OpenApiExample(name='이번 달', value='month'),
+                    OpenApiExample(name='전체 기간', value='all'),
+                ]
+            )
+        ],
+        responses={200: AIGenerationStatSerializer}
+    )
     def get(self, request, user_id: int):
         period = request.query_params.get('period', 'month')
         

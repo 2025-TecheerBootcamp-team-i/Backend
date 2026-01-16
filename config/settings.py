@@ -276,7 +276,9 @@ AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'ap-northeast-2')
 AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN', f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com')
 
 # S3 버킷이 설정된 경우에만 S3를 기본 스토리지로 사용
-if AWS_STORAGE_BUCKET_NAME:
+# 단, DEBUG 모드에서는 로컬 정적 파일 스토리지 사용 (개발 편의성)
+if AWS_STORAGE_BUCKET_NAME and not DEBUG:
+    # 프로덕션: S3 스토리지 사용
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
     
@@ -287,5 +289,6 @@ if AWS_STORAGE_BUCKET_NAME:
     AWS_DEFAULT_ACL = 'public-read'  # 퍼블릭 읽기 허용
     AWS_QUERYSTRING_AUTH = False  # URL에 서명 불필요 (퍼블릭 파일)
 else:
-    # S3 버킷이 설정되지 않은 경우 로컬 스토리지 사용
+    # 개발 환경 또는 S3 미설정: 로컬 스토리지 사용
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
