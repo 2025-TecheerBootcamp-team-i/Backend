@@ -10,11 +10,14 @@ class iTunesSearchResultSerializer(serializers.Serializer):
     
     - iTunes API 결과는 기본적으로 is_ai=False
     - 프론트에서 is_ai 필드로 클라이언트 사이드 필터링 가능
+    - artist_id, album_id는 DB에 해당 데이터가 있을 때만 포함 (없으면 null)
     """
     itunes_id = serializers.IntegerField()
     music_name = serializers.CharField()
     artist_name = serializers.CharField()
+    artist_id = serializers.IntegerField(allow_null=True)  # 아티스트 ID (DB에 있을 때만)
     album_name = serializers.CharField()
+    album_id = serializers.IntegerField(allow_null=True)  # 앨범 ID (DB에 있을 때만)
     genre = serializers.CharField()
     duration = serializers.IntegerField(allow_null=True)  # 재생 시간 (초)
     audio_url = serializers.CharField(allow_null=True)  # 실제 재생용 오디오 URL (30초 preview)
