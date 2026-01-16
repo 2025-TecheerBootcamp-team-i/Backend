@@ -10,6 +10,7 @@ from .common import MusicPagination, ErrorTestView, DatabaseQueryTestView
 from .auth import (
     RegisterView,
     LoginView,
+    TokenRefreshView,
 )
 
 # 좋아요 관련 Views
@@ -57,6 +58,7 @@ __all__ = [
     # auth
     'RegisterView',
     'LoginView',
+    'TokenRefreshView',
     # likes
     'MusicLikeView',
     # search

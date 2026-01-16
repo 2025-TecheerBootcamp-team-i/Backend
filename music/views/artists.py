@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from drf_spectacular.utils import extend_schema
 
 from ..models import Artists, Music, Albums
 from ..serializers import ArtistSerializer
@@ -18,6 +19,12 @@ class ArtistDetailView(APIView):
     """
 
     permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="아티스트 상세 조회",
+        description="아티스트 ID로 단일 아티스트 정보 조회",
+        tags=['아티스트']
+    )
 
     def get(self, request, artist_id: int):
         """
@@ -47,6 +54,12 @@ class ArtistTracksView(APIView):
     """
 
     permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="아티스트별 곡 목록",
+        description="아티스트 ID로 해당 아티스트의 곡 목록 조회",
+        tags=['아티스트']
+    )
 
     def get(self, request, artist_id: int):
         """
@@ -99,6 +112,12 @@ class ArtistAlbumsView(APIView):
     """
 
     permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="아티스트별 앨범 목록",
+        description="아티스트 ID로 해당 아티스트의 앨범 목록 조회",
+        tags=['아티스트']
+    )
 
     def get(self, request, artist_id: int):
         """

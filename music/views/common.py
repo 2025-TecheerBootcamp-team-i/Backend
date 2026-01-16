@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework import status
 import random
 from django.db import connection
+from drf_spectacular.utils import extend_schema
 from ..models import Music, Artists, Albums, Tags, MusicTags, PlayLogs
 
 
@@ -27,6 +28,12 @@ class ErrorTestView(APIView):
     - GET /api/v1/test/error?code=500&rate=1.0  # 100% 확률로 500 에러 발생
     """
     permission_classes = []  # 인증 불필요 (테스트용)
+    
+    @extend_schema(
+        summary="에러율 테스트",
+        description="테스트용 에러 발생 엔드포인트 (Grafana 모니터링 테스트용)",
+        tags=['테스트']
+    )
     
     def get(self, request):
         # 쿼리 파라미터에서 에러 코드와 발생 확률 가져오기
@@ -83,6 +90,12 @@ class DatabaseQueryTestView(APIView):
     - GET /api/v1/test/db?count=50&type=all  # 모든 타입의 쿼리 실행
     """
     permission_classes = []  # 인증 불필요 (테스트용)
+    
+    @extend_schema(
+        summary="DB 쿼리 테스트",
+        description="Database Queries 메트릭 테스트용 엔드포인트 (Grafana 모니터링 테스트용)",
+        tags=['테스트']
+    )
     
     def get(self, request):
         count = int(request.query_params.get('count', 10))
