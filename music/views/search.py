@@ -12,6 +12,7 @@ from drf_spectacular.types import OpenApiTypes
 from ..models import Music, MusicTags, Tags, Artists, Albums
 from ..serializers import iTunesSearchResultSerializer
 from ..services import iTunesService
+from ..tasks import fetch_artist_image_task
 from .common import MusicPagination
 
 
@@ -192,15 +193,26 @@ class MusicSearchView(APIView):
                 # DB에 없는 아티스트 생성
                 for artist_name in artist_names:
                     if artist_name not in artist_name_to_id:
-                        artist, _ = Artists.objects.get_or_create(
+                        artist, artist_created = Artists.objects.get_or_create(
                             artist_name=artist_name,
                             defaults={
-                                'artist_image': '',
+                                'artist_image': '',  # 비동기로 수집
                                 'created_at': timezone.now(),
                                 'is_deleted': False,
                             }
                         )
                         artist_name_to_id[artist_name] = artist.artist_id
+                        
+                        # 아티스트 이미지 비동기 수집 (새로 생성되었거나 이미지가 없는 경우)
+                        if artist_created or not artist.artist_image:
+                            try:
+                                fetch_artist_image_task.delay(artist.artist_id, artist_name)
+                            except Exception as e:
+                                # 태스크 호출 실패해도 기본 저장은 완료되도록 함
+                                import logging
+                                logging.getLogger(__name__).warning(
+                                    f"아티스트 이미지 태스크 호출 실패: {e}"
+                                )
             
             # 앨범 이름과 아티스트 조합으로 DB에서 앨범 ID 조회 및 생성
             # 앨범은 아티스트별로 처리해야 하므로 결과별로 처리
