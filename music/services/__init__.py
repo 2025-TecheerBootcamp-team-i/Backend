@@ -8,6 +8,7 @@ from .wikidata import WikidataService
 from .lrclib import LRCLIBService
 from .deezer import DeezerService
 from .lyrics_ovh import LyricsOvhService
+from .user_statistics import UserStatisticsService
 
 __all__ = [
     'iTunesService',
@@ -15,4 +16,5 @@ __all__ = [
     'LRCLIBService',
     'DeezerService',       # Wikidata fallback (아티스트 이미지)
     'LyricsOvhService',    # LRCLIB fallback (가사)
+    'UserStatisticsService',  # 사용자 음악 통계
 ]

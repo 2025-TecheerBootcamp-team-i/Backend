@@ -29,6 +29,16 @@ from .auth import (
     UserLoginSerializer,
 )
 
+# 사용자 통계 Serializers
+from .statistics import (
+    ListeningTimeSerializer,
+    GenreStatSerializer,
+    ArtistStatSerializer,
+    TagStatSerializer,
+    AIGenerationStatSerializer,
+    UserStatisticsSerializer,
+)
+
 # 외부에서 사용 가능한 모든 클래스
 __all__ = [
     # base
@@ -45,4 +55,11 @@ __all__ = [
     # auth
     'UserRegisterSerializer',
     'UserLoginSerializer',
+    # statistics (사용자 통계)
+    'ListeningTimeSerializer',
+    'GenreStatSerializer',
+    'ArtistStatSerializer',
+    'TagStatSerializer',
+    'AIGenerationStatSerializer',
+    'UserStatisticsSerializer',
 ]
