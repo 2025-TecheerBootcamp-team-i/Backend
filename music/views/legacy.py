@@ -79,13 +79,10 @@ def generate_music(request):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         
-        # Llama가 생성한 파라미터 추출
-        # 제목은 이제 Llama가 만든 것을 쓰지 않고, 사용자가 입력한 내용을 그대로 사용
-        llama_title = music_params.get('title', user_prompt[:50])
+        # Llama가 생성한 파라미터 추출 (title은 Suno가 생성하므로 제외)
         llama_style = music_params.get('style', 'K-Pop')
         llama_prompt = music_params.get('prompt', '')
         
-        print(f"[Llama 결과] title: {llama_title}")
         print(f"[Llama 결과] style: {llama_style}")
         print(f"[Llama 결과] prompt: {llama_prompt}")
         
@@ -141,14 +138,23 @@ def generate_music(request):
                     return value
             return None
         
+        # 제목 결정 헬퍼: 'AI Generated Song' 같은 기본값은 무시
+        def get_valid_title(api_title):
+            """API 제목이 의미있는 값인지 확인. 기본값이면 None 반환"""
+            invalid_titles = ['AI Generated Song', 'Untitled', 'Unknown', '', None]
+            if api_title in invalid_titles:
+                return None
+            return api_title
+        
         # 응답 형식 1: sunoData 리스트
         suno_data = music_result.get('sunoData', [])
         if isinstance(suno_data, list) and len(suno_data) > 0:
             print(f"[데이터 추출] sunoData 리스트 형식 발견 (길이: {len(suno_data)})")
             first_song = suno_data[0]
             audio_url = extract_field(first_song, 'audioUrl', 'audio_url', 'url', 'audio', 'audioFile')
-            # 제목은 Suno가 생성한 제목을 우선 사용하고, 없으면 사용자 입력을 fallback으로 사용
-            music_title = extract_field(first_song, 'title', 'name', 'song_name', 'songName') or user_prompt[:50]
+            # 제목: 사용자 입력 우선, API 제목은 의미있는 경우에만 사용
+            api_title = extract_field(first_song, 'title', 'name', 'song_name', 'songName')
+            music_title = user_prompt[:50]  # 사용자 입력을 기본값으로 사용
             duration = extract_field(first_song, 'duration', 'length', 'time', 'duration_seconds')
             lyrics = extract_field(first_song, 'lyrics', 'lyric', 'text', 'song_lyrics')
             image_url = extract_field(first_song, 'imageUrl', 'image_url', 'image', 'cover', 'cover_url', 'cover_url')
@@ -161,8 +167,9 @@ def generate_music(request):
         elif isinstance(music_result, dict):
             print(f"[데이터 추출] 직접 필드 접근 형식")
             audio_url = extract_field(music_result, 'audioUrl', 'audio_url', 'url', 'audio', 'audioFile')
-            # 제목은 Suno가 생성한 제목을 우선 사용하고, 없으면 사용자 입력을 fallback으로 사용
-            music_title = extract_field(music_result, 'title', 'name', 'song_name', 'songName') or music_result.get('title') or user_prompt[:50]
+            # 제목: 사용자 입력 우선 (API 기본값 'AI Generated Song' 무시)
+            api_title = extract_field(music_result, 'title', 'name', 'song_name', 'songName')
+            music_title = user_prompt[:50]  # 사용자 입력을 기본값으로 사용
             duration = extract_field(music_result, 'duration', 'length', 'time', 'duration_seconds')
             lyrics = extract_field(music_result, 'lyrics', 'lyric', 'text', 'song_lyrics')
             image_url = extract_field(music_result, 'imageUrl', 'image_url', 'image', 'cover', 'cover_url')
@@ -177,8 +184,6 @@ def generate_music(request):
             # Polling 실패 시에도 기본 데이터는 music_result에 포함되어 있음
             if isinstance(music_result, dict):
                 audio_url = music_result.get('audioUrl')
-                # 제목은 Suno가 생성한 제목을 우선 사용하고, 없으면 사용자 입력을 fallback으로 사용
-                music_title = music_result.get('title') or user_prompt[:50]
                 duration = music_result.get('duration')
                 lyrics = music_result.get('lyrics')
                 image_url = music_result.get('imageUrl')
@@ -186,12 +191,13 @@ def generate_music(request):
                 audio_id = music_result.get('audioId') or music_result.get('audio_id') or music_result.get('id')
             else:
                 audio_url = None
-                music_title = user_prompt[:50]
                 duration = None
                 lyrics = None
                 image_url = None
                 api_genre = llama_style
                 audio_id = None
+            # 제목: 사용자 입력 사용
+            music_title = user_prompt[:50]
             valence = None
             arousal = None
         
@@ -336,10 +342,12 @@ def generate_music(request):
         
         try:
             # 7. AiInfo 모델에 프롬프트 정보 저장
+            # task_id 필드를 직접 설정해야 webhook 태스크에서 찾을 수 있음
             print(f"[DB 저장] AiInfo 저장 시작: task_id={task_id}")
             ai_info = AiInfo.objects.create(
                 music=music,
-                input_prompt=f"TaskID: {task_id}\nOriginal: {user_prompt}\nTitle: {llama_title}\nStyle: {llama_style}\nPrompt: {llama_prompt}",
+                task_id=task_id,  # Webhook 태스크에서 이 필드로 검색함
+                input_prompt=f"TaskID: {task_id}\nOriginal: {user_prompt}\nStyle: {llama_style}\nPrompt: {llama_prompt}",
                 created_at=now,
                 updated_at=now,
                 is_deleted=False

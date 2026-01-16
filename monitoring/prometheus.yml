@@ -7,7 +7,7 @@ global:
   external_labels:
     monitor: 'music-backend'  # 외부 시스템 연동 시 라벨
 
-# 스크래핑 대상 설정
+# 스크래핑 대상 설정 (prometheus가 수집할 대상을 설정)
 scrape_configs:
   # Prometheus 자체 메트릭
   - job_name: 'prometheus'

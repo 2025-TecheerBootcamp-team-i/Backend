@@ -49,7 +49,6 @@ class LlamaService:
             
         Returns:
             {
-                'title': '영어 제목',
                 'style': '장르',
                 'prompt': '음악 설명 프롬프트'
             }
@@ -59,25 +58,25 @@ class LlamaService:
         
         # Suno API용 구조화된 출력을 위한 프롬프트
         # 중괄호는 LangChain 변수로 인식되므로 이스케이프 필요: {{ }}
+        # title은 Suno가 생성하므로 Llama에서는 style과 prompt만 생성
         system_prompt_text = """You are a music prompt engineer. Convert Korean input to Suno API parameters.
         
 OUTPUT FORMAT (JSON only, no other text):
-{{"title": "Korean song title (max 50 chars)", "style": "Genre", "prompt": "English music description (max 150 chars)"}}
+{{"style": "Genre", "prompt": "English music description (max 150 chars)"}}
         
 RULES:
-1. title: Use the user's input directly as the song title, or create a concise summary if the input is too long. Keep it natural Korean, up to 50 characters. DO NOT create unrelated or random titles.
-2. style: One genre from: K-Pop, Pop, Rock, Ballad, Jazz, Electronic, Folk, R&B, Hip-Hop, Classical
-3. prompt: Start with a short natural English translation of the Korean input (e.g., \"나의 꽃이면\" -> \"my flower\"), then add a concise English music description with mood, tempo, and instruments. The song MUST have Korean lyrics and Korean vocals. Explicitly mention \"Korean lyrics\" and the vocal type (e.g., \"Korean male vocals\") in the description. Total length max 150 chars.
-4. Output ONLY valid JSON, nothing else
+1. style: One genre from: K-Pop, Pop, Rock, Ballad, Jazz, Electronic, Folk, R&B, Hip-Hop, Classical
+2. prompt: Start with a short natural English translation of the Korean input (e.g., \"나의 꽃이면\" -> \"my flower\"), then add a concise English music description with mood, tempo, and instruments. The song MUST have Korean lyrics and Korean vocals. Explicitly mention \"Korean lyrics\" and the vocal type (e.g., \"Korean male vocals\") in the description. Total length max 150 chars.
+3. Output ONLY valid JSON, nothing else
         
 Example input: 음악
-Example output: {{"title": "음악", "style": "Pop", "prompt": "music, catchy upbeat Pop, 120 BPM, synthesizer drums bass, energetic Korean lyrics and Korean male vocals"}}
+Example output: {{"style": "Pop", "prompt": "music, catchy upbeat Pop, 120 BPM, synthesizer drums bass, energetic Korean lyrics and Korean male vocals"}}
         
 Example input: 나의 꽃이면
-Example output: {{"title": "나의 꽃이면", "style": "Ballad", "prompt": "my flower, emotional ballad, 80 BPM, piano strings, soft Korean lyrics and Korean female vocals"}}
+Example output: {{"style": "Ballad", "prompt": "my flower, emotional ballad, 80 BPM, piano strings, soft Korean lyrics and Korean female vocals"}}
         
 Example input: 슬픈 사랑 이야기
-Example output: {{"title": "슬픈 사랑 이야기", "style": "Ballad", "prompt": "sad love story, emotional ballad, 70 BPM, piano strings, melancholic Korean lyrics and Korean female vocals"}}"""
+Example output: {{"style": "Ballad", "prompt": "sad love story, emotional ballad, 70 BPM, piano strings, melancholic Korean lyrics and Korean female vocals"}}"""
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt_text),
@@ -105,7 +104,6 @@ Example output: {{"title": "슬픈 사랑 이야기", "style": "Ballad", "prompt
             # JSON 파싱 실패 시 기본값으로 폴백
             print(f"[Llama] JSON 파싱 실패, 기본값 사용")
             return {
-                'title': korean_input[:50],
                 'style': 'K-Pop',
                 'prompt': f"Korean pop song about {korean_input}, melodic, 90 BPM, piano guitar, Korean female vocals"
             }

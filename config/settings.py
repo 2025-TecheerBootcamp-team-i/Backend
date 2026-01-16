@@ -93,6 +93,9 @@ DATABASES = {
         'PASSWORD': os.getenv('SQL_PASSWORD', 'music_password'),
         'HOST': os.getenv('SQL_HOST', 'db'), # docker-compose 서비스 이름
         'PORT': os.getenv('SQL_PORT', '5432'), # PostgreSQL 기본 포트
+        'OPTIONS': {
+            'sslmode': 'require',  # AWS RDS는 SSL 연결 필요
+        } if os.getenv('SQL_HOST', '').endswith('.rds.amazonaws.com') else {},
     }
 }
 

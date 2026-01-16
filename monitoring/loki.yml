@@ -7,7 +7,7 @@ server:
   http_listen_port: 3100
   grpc_listen_port: 9096
 
-common:
+common: # Loki 서버 설정 (로그 저장 및 복제 설정)
   instance_addr: 127.0.0.1
   path_prefix: /loki
   storage:
@@ -19,14 +19,14 @@ common:
     kvstore:
       store: inmemory
 
-query_range:
+query_range: # 쿼리 범위 설정 (로그 조회 성능 최적화)
   results_cache:
     cache:
       embedded_cache:
         enabled: true
         max_size_mb: 100
 
-schema_config:
+schema_config: # 스키마 설정 (로그 저장 형식 설정)
   configs:
     - from: 2020-10-24
       store: tsdb
@@ -36,10 +36,10 @@ schema_config:
         prefix: index_
         period: 24h
 
-ruler:
+ruler: # 경보 관리 설정 (경보 관리 설정)
   alertmanager_url: http://localhost:9093
 
-limits_config:
+limits_config: # 제한 설정 (로그 저장 제한 설정)
   retention_period: 168h  # 로그 보존 기간: 7일
   ingestion_rate_mb: 10
   ingestion_burst_size_mb: 20

@@ -250,6 +250,9 @@ def generate_music_task(self, user_prompt: str, user_id: int = None, make_instru
             music_result.get('data', {}).get('image_url')
         )
         
+        # task_id 추출 (Webhook에서 사용)
+        task_id = music_result.get('taskId') or music_result.get('task_id') or 'unknown'
+        
         # 4. Artists 모델에 저장
         artist = Artists.objects.create(
             artist_name=artist_name,
@@ -288,9 +291,11 @@ def generate_music_task(self, user_prompt: str, user_id: int = None, make_instru
         )
         
         # 7. AiInfo 모델에 프롬프트 정보 저장
+        # task_id 필드를 직접 설정해야 webhook 태스크에서 찾을 수 있음
         ai_info = AiInfo.objects.create(
             music=music,
-            input_prompt=f"Original: {user_prompt}\nConverted: {english_prompt}",
+            task_id=task_id,  # Webhook 태스크에서 이 필드로 검색함
+            input_prompt=f"TaskID: {task_id}\nOriginal: {user_prompt}\nConverted: {english_prompt}",
             created_at=now,
             updated_at=now,
             is_deleted=False
@@ -557,14 +562,15 @@ def process_suno_webhook_task(self, webhook_data: dict):
         # Music 업데이트
         now = timezone.now()
         
-        # 제목: Llama가 생성한 제목을 유지 (Suno 제목으로 덮어쓰지 않음)
-        # generate_music 단계에서 이미 Llama 제목이 저장되어 있으므로 webhook에서는 유지
-        if not music.music_name and title:
-            # music_name이 비어 있을 때만 Suno 제목을 fallback으로 사용
+        # 제목: Suno가 생성한 제목 사용 (유효한 제목인 경우에만)
+        # 'AI Generated Song' 등의 기본값은 무시
+        invalid_titles = ['AI Generated Song', 'Untitled', 'Unknown', '', None]
+        if title and title not in invalid_titles:
+            old_title = music.music_name
             music.music_name = title
-            logger.info(f"[Webhook 태스크] 제목 fallback (Llama 제목 없음): {title}")
+            logger.info(f"[Webhook 태스크] 제목 업데이트 (Suno 제목): {old_title} → {title}")
         else:
-            logger.info(f"[Webhook 태스크] 제목 유지 (Llama 제목 사용): {music.music_name}")
+            logger.info(f"[Webhook 태스크] 제목 유지 (Suno 제목 무효): {music.music_name}")
         
         # audio_url: S3 URL이 아닐 때만 업데이트
         if audio_url and not is_s3_url(music.audio_url):
@@ -601,8 +607,10 @@ def process_suno_webhook_task(self, webhook_data: dict):
             except Exception as e:
                 logger.error(f"[Webhook 태스크] S3 업로드 태스크 호출 실패: {e}")
         
-        # 타임스탬프 가사 조회 태스크 호출
-        if audio_url and task_id and callback_type in ['first', 'complete'] and not music.is_instrumental:
+        # 타임스탬프 가사 조회 태스크 호출 (가사가 있는 경우에만)
+        # is_instrumental 필드가 Music 모델에 없으므로, 가사 존재 여부로 판단
+        has_vocals = lyrics and len(lyrics) > 50  # 가사가 50자 이상이면 vocal 곡으로 간주
+        if audio_url and task_id and callback_type in ['first', 'complete'] and has_vocals:
             try:
                 logger.info(f"[Webhook 태스크] 타임스탬프 가사 조회 태스크 호출")
                 fetch_timestamped_lyrics_task.delay(music.music_id, task_id, audio_id)
