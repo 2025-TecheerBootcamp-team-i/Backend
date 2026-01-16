@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
 from ..models import Music, MusicLikes
 from ..serializers import MusicLikeSerializer
 
@@ -18,6 +19,12 @@ class MusicLikeView(APIView):
     - DELETE: 좋아요 취소
     """
     permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="좋아요 등록",
+        description="음악에 좋아요 등록",
+        tags=['좋아요']
+    )
     
     def post(self, request, music_id):
         """
@@ -58,6 +65,11 @@ class MusicLikeView(APIView):
         
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
+    @extend_schema(
+        summary="좋아요 취소",
+        description="음악 좋아요 취소",
+        tags=['좋아요']
+    )
     def delete(self, request, music_id):
         """
         좋아요 취소

@@ -6,7 +6,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshView
 from django.contrib.auth.hashers import check_password
+from drf_spectacular.utils import extend_schema
 from ..models import Users
 from ..serializers import UserRegisterSerializer, UserLoginSerializer
 
@@ -17,6 +19,12 @@ class RegisterView(APIView):
     POST /api/v1/auth/users/
     """
     permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="회원가입",
+        description="이메일, 비밀번호, 닉네임으로 회원가입",
+        tags=['인증']
+    )
     
     def post(self, request):
         """이메일, 비밀번호, 닉네임으로 회원가입"""
@@ -39,6 +47,12 @@ class LoginView(APIView):
     이메일/비밀번호 검증 후 JWT 토큰(Access, Refresh) 발급
     """
     permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="로그인",
+        description="이메일/비밀번호 검증 후 JWT 토큰(Access, Refresh) 발급",
+        tags=['인증']
+    )
     
     def post(self, request):
         """로그인 처리 및 JWT 토큰 발급"""
@@ -77,3 +91,20 @@ class LoginView(APIView):
             'email': user.email,
             'nickname': user.nickname
         }, status=status.HTTP_200_OK)
+
+
+class TokenRefreshView(BaseTokenRefreshView):
+    """
+    JWT Refresh Token 갱신 API
+    
+    POST /api/v1/auth/refresh/
+    POST /api/music/auth/refresh/
+    """
+    
+    @extend_schema(
+        summary="JWT 토큰 갱신",
+        description="Refresh Token을 사용하여 새로운 Access Token 발급",
+        tags=['인증']
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)

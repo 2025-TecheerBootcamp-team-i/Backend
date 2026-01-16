@@ -10,6 +10,7 @@ from .common import MusicPagination, ErrorTestView, DatabaseQueryTestView
 from .auth import (
     RegisterView,
     LoginView,
+    TokenRefreshView,
 )
 
 # 좋아요 관련 Views
@@ -23,6 +24,16 @@ from .music import MusicDetailView, MusicPlayView
 
 # 아티스트 관련 Views
 from .artists import ArtistDetailView, ArtistTracksView, ArtistAlbumsView
+
+# 사용자 통계 관련 Views
+from .statistics import (
+    UserStatisticsView,
+    UserListeningTimeView,
+    UserTopGenresView,
+    UserTopArtistsView,
+    UserTopTagsView,
+    UserAIGenerationView,
+)
 
 # 레거시 함수 기반 Views (웹 페이지 및 음악 생성)
 from .legacy import (
@@ -47,6 +58,7 @@ __all__ = [
     # auth
     'RegisterView',
     'LoginView',
+    'TokenRefreshView',
     # likes
     'MusicLikeView',
     # search
@@ -58,6 +70,13 @@ __all__ = [
     'ArtistDetailView',
     'ArtistTracksView',
     'ArtistAlbumsView',
+    # statistics (사용자 통계)
+    'UserStatisticsView',
+    'UserListeningTimeView',
+    'UserTopGenresView',
+    'UserTopArtistsView',
+    'UserTopTagsView',
+    'UserAIGenerationView',
     # legacy (함수 기반)
     'music_generator_page',
     'music_list_page',
