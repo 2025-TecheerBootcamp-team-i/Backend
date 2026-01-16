@@ -162,11 +162,11 @@ CELERY_ENABLE_UTC = False
 # ==============================================
 # REST API의 기본 인증 및 권한 설정을 정의합니다.
 REST_FRAMEWORK = {
-    # 기본 인증 방식: JWT(JSON Web Token)를 사용합니다.
-    # 클라이언트는 로그인 후 발급받은 토큰을 Authorization 헤더에 포함하여 요청합니다.
+    # 기본 인증 방식: 커스텀 JWT 인증을 사용합니다.
+    # Users 모델과 연동하여 JWT 토큰을 검증합니다.
     # 예: Authorization: Bearer <access_token>
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'music.authentication.CustomJWTAuthentication',  # 커스텀 JWT 인증
     ),
     
     # 기본 권한 정책: 모든 사용자에게 접근 허용 (인증 불필요)

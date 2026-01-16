@@ -39,6 +39,17 @@ from .statistics import (
     UserStatisticsSerializer,
 )
 
+# 플레이리스트 관련 Serializers
+from .playlist import (
+    PlaylistSerializer,
+    PlaylistDetailSerializer,
+    PlaylistCreateSerializer,
+    PlaylistUpdateSerializer,
+    PlaylistItemSerializer,
+    PlaylistItemAddSerializer,
+    PlaylistLikeSerializer,
+)
+
 # 외부에서 사용 가능한 모든 클래스
 __all__ = [
     # base
@@ -62,4 +73,12 @@ __all__ = [
     'TagStatSerializer',
     'AIGenerationStatSerializer',
     'UserStatisticsSerializer',
+    # playlist
+    'PlaylistSerializer',
+    'PlaylistDetailSerializer',
+    'PlaylistCreateSerializer',
+    'PlaylistUpdateSerializer',
+    'PlaylistItemSerializer',
+    'PlaylistItemAddSerializer',
+    'PlaylistLikeSerializer',
 ]
