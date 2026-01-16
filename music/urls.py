@@ -16,6 +16,13 @@ from .views import (
     ArtistAlbumsView,
     ErrorTestView,
     DatabaseQueryTestView,
+    # 사용자 통계
+    UserStatisticsView,
+    UserListeningTimeView,
+    UserTopGenresView,
+    UserTopArtistsView,
+    UserTopTagsView,
+    UserAIGenerationView,
 )
 
 app_name = 'music'
@@ -90,4 +97,31 @@ urlpatterns = [
     
     # 음악 상세 조회
     path('<int:music_id>/', views.get_music_detail, name='get_music_detail'),
+    
+    # ========================
+    # 사용자 통계 API
+    # ========================
+    # 전체 통계 조회
+    # GET /api/v1/users/{user_id}/statistics/?period=month|all
+    path('users/<int:user_id>/statistics/', UserStatisticsView.as_view(), name='user-statistics'),
+    
+    # 청취 시간 통계
+    # GET /api/v1/users/{user_id}/statistics/listening-time/
+    path('users/<int:user_id>/statistics/listening-time/', UserListeningTimeView.as_view(), name='user-listening-time'),
+    
+    # Top 장르 통계
+    # GET /api/v1/users/{user_id}/statistics/genres/?limit=3
+    path('users/<int:user_id>/statistics/genres/', UserTopGenresView.as_view(), name='user-top-genres'),
+    
+    # Top 아티스트 통계
+    # GET /api/v1/users/{user_id}/statistics/artists/?limit=3
+    path('users/<int:user_id>/statistics/artists/', UserTopArtistsView.as_view(), name='user-top-artists'),
+    
+    # Top 태그(분위기/키워드) 통계
+    # GET /api/v1/users/{user_id}/statistics/tags/?limit=6
+    path('users/<int:user_id>/statistics/tags/', UserTopTagsView.as_view(), name='user-top-tags'),
+    
+    # AI 생성 활동 통계
+    # GET /api/v1/users/{user_id}/statistics/ai-generation/
+    path('users/<int:user_id>/statistics/ai-generation/', UserAIGenerationView.as_view(), name='user-ai-generation'),
 ]
