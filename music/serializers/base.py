@@ -21,6 +21,92 @@ class AlbumSerializer(serializers.ModelSerializer):
         fields = ['album_id', 'album_name', 'album_image']
 
 
+class AlbumDetailSerializer(serializers.ModelSerializer):
+    """앨범 상세 조회용 Serializer (수록곡 목록 포함)"""
+    artist = ArtistSerializer(read_only=True)
+    tracks = serializers.SerializerMethodField()
+    track_count = serializers.SerializerMethodField()
+    total_duration = serializers.SerializerMethodField()
+    total_duration_formatted = serializers.SerializerMethodField()
+    like_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Albums
+        fields = [
+            'album_id', 'album_name', 'album_image', 'artist',
+            'track_count', 'total_duration', 'total_duration_formatted',
+            'like_count', 'tracks', 'created_at', 'updated_at'
+        ]
+    
+    def get_tracks(self, obj):
+        """앨범의 수록곡 목록 조회"""
+        from ..models import Music
+        tracks = Music.objects.filter(
+            album=obj,
+            is_deleted__in=[False, None]
+        ).select_related('artist').order_by('created_at')
+        
+        tracks_data = []
+        for track in tracks:
+            # duration을 "mm:ss" 형식으로 변환
+            duration_str = "-"
+            if track.duration:
+                minutes = track.duration // 60
+                seconds = track.duration % 60
+                duration_str = f"{minutes}:{seconds:02d}"
+            
+            tracks_data.append({
+                'music_id': track.music_id,
+                'music_name': track.music_name,
+                'artist_name': track.artist.artist_name if track.artist else None,
+                'duration': duration_str,
+                'duration_seconds': track.duration,
+                'is_ai': track.is_ai,
+            })
+        
+        return tracks_data
+    
+    def get_track_count(self, obj):
+        """앨범의 곡 개수"""
+        from ..models import Music
+        return Music.objects.filter(
+            album=obj,
+            is_deleted__in=[False, None]
+        ).count()
+    
+    def get_total_duration(self, obj):
+        """앨범의 총 재생 시간 (초)"""
+        from ..models import Music
+        from django.db.models import Sum
+        result = Music.objects.filter(
+            album=obj,
+            is_deleted__in=[False, None]
+        ).aggregate(total=Sum('duration'))
+        return result['total'] or 0
+    
+    def get_total_duration_formatted(self, obj):
+        """앨범의 총 재생 시간 (포맷팅: mm:ss)"""
+        total_seconds = self.get_total_duration(obj)
+        if total_seconds:
+            minutes = total_seconds // 60
+            seconds = total_seconds % 60
+            return f"{minutes}:{seconds:02d}"
+        return "0:00"
+    
+    def get_like_count(self, obj):
+        """앨범의 곡들에 대한 총 좋아요 수"""
+        from ..models import Music, MusicLikes
+        album_music_ids = Music.objects.filter(
+            album=obj,
+            is_deleted__in=[False, None]
+        ).values_list('music_id', flat=True)
+        
+        return MusicLikes.objects.filter(
+            music_id__in=album_music_ids,
+            is_deleted__in=[False, None]
+        ).count()
+
+
 class TagSerializer(serializers.ModelSerializer):
     """태그 정보 Serializer"""
     

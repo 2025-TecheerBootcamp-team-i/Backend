@@ -23,7 +23,7 @@ from .search import MusicSearchView
 from .music import MusicDetailView, MusicPlayView
 
 # 아티스트 관련 Views
-from .artists import ArtistDetailView, ArtistTracksView, ArtistAlbumsView
+from .artists import ArtistDetailView, ArtistTracksView, ArtistAlbumsView, AlbumDetailView
 
 # 사용자 통계 관련 Views
 from .statistics import (
@@ -79,6 +79,7 @@ __all__ = [
     'ArtistDetailView',
     'ArtistTracksView',
     'ArtistAlbumsView',
+    'AlbumDetailView',
     # statistics (사용자 통계)
     'UserStatisticsView',
     'UserListeningTimeView',

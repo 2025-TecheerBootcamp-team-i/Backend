@@ -15,6 +15,7 @@ from .views import (
     ArtistDetailView,
     ArtistTracksView,
     ArtistAlbumsView,
+    AlbumDetailView,
     ErrorTestView,
     DatabaseQueryTestView,
     # 사용자 통계
@@ -72,6 +73,10 @@ urlpatterns = [
     # 아티스트별 앨범 목록 조회
     # GET /api/v1/artists/{artist_id}/albums/
     path('artists/<int:artist_id>/albums/', ArtistAlbumsView.as_view(), name='artist-albums'),
+    
+    # 앨범 상세 조회
+    # GET /api/v1/albums/{album_id}/
+    path('albums/<int:album_id>/', AlbumDetailView.as_view(), name='album-detail'),
     
     # 좋아요 등록/취소
     # POST /api/v1/tracks/{music_id}/likes

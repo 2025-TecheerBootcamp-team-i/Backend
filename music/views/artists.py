@@ -9,6 +9,7 @@ from drf_spectacular.utils import extend_schema
 
 from ..models import Artists, Music, Albums
 from ..serializers import ArtistSerializer
+from ..serializers.base import AlbumDetailSerializer
 
 
 class ArtistDetailView(APIView):
@@ -156,5 +157,40 @@ class ArtistAlbumsView(APIView):
                 "album_image": album.album_image if album.album_image else None,
             })
 
-        return Response(albums_data, status=status.HTTP_200_OK)
+            return Response(albums_data, status=status.HTTP_200_OK)
+
+
+class AlbumDetailView(APIView):
+    """
+    앨범 상세 조회
+
+    - GET /api/v1/albums/{album_id}/
+    """
+
+    permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="앨범 상세 조회",
+        description="앨범 ID로 단일 앨범 정보 및 수록곡 목록 조회",
+        tags=['앨범']
+    )
+
+    def get(self, request, album_id: int):
+        """
+        앨범 ID(album_id)로 단일 앨범 정보 및 수록곡 목록을 조회합니다.
+        """
+        try:
+            # is_deleted가 False이거나 NULL인 앨범만 조회
+            album = Albums.objects.select_related('artist').get(
+                album_id=album_id,
+                is_deleted__in=[False, None],
+            )
+        except Albums.DoesNotExist:
+            return Response(
+                {"detail": "앨범을 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = AlbumDetailSerializer(album)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 

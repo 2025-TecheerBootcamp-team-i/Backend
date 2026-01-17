@@ -1,10 +1,14 @@
 {
+  "uid": "24bdc8d6-2581-4a85-b7a9-aaf2ac45b662",
   "title": "Django Application Metrics",
   "tags": ["django", "backend", "api"],
   "timezone": "browser",
   "schemaVersion": 38,
   "version": 1,
   "refresh": "10s",
+  "templating": {
+    "list": []
+  },
   "panels": [
     {
       "id": 1,
@@ -64,12 +68,28 @@
     },
     {
       "id": 4,
-      "title": "Error Rate",
+      "title": "Total Requests",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16},
       "targets": [
         {
-          "expr": "(sum(rate(django_http_responses_total_by_status_total{status=~'5..'}[5m])) or vector(0)) / clamp_min(sum(rate(django_http_responses_total_by_status_total[5m])), 1) * 100",
+          "expr": "sum(rate(django_http_requests_total_by_method_total[5m]))",
+          "legendFormat": "Total",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "unit": "reqps"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Error Rate",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 16},
+      "targets": [
+        {
+          "expr": "(sum(rate(django_http_responses_total_by_status_total{status=~'5..'}[5m])) or vector(0)) / clamp_min((sum(rate(django_http_responses_total_by_status_total[5m])) or vector(0)), 1) * 100",
           "legendFormat": "Error Rate",
           "refId": "A"
         }
@@ -92,26 +112,10 @@
       }
     },
     {
-      "id": 5,
-      "title": "Total Requests",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 8},
-      "targets": [
-        {
-          "expr": "sum(increase(django_http_requests_before_middlewares_total[1h]))",
-          "legendFormat": "Total",
-          "refId": "A"
-        }
-      ],
-      "options": {
-        "unit": "short"
-      }
-    },
-    {
       "id": 6,
       "title": "Database Queries",
       "type": "graph",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
       "targets": [
         {
           "expr": "sum(rate(django_db_execute_total[5m])) or vector(0)",
@@ -126,18 +130,18 @@
     },
     {
       "id": 7,
-      "title": "Cache Operations",
+      "title": "Database Connections",
       "type": "graph",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
       "targets": [
         {
-          "expr": "sum(rate(django_cache_operations_total[5m])) by (operation) or vector(0)",
-          "legendFormat": "{{operation}}",
+          "expr": "sum(rate(django_db_new_connections_total[5m])) or vector(0)",
+          "legendFormat": "New Connections/sec",
           "refId": "A"
         }
       ],
       "yaxes": [
-        {"format": "ops", "label": "Operations/sec"},
+        {"format": "ops", "label": "Connections/sec"},
         {"format": "short"}
       ]
     }

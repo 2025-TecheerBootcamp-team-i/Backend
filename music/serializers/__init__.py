@@ -7,6 +7,7 @@ Music 앱의 Serializers 패키지
 from .base import (
     ArtistSerializer,
     AlbumSerializer,
+    AlbumDetailSerializer,
     TagSerializer,
     AiInfoSerializer,
 )
@@ -55,6 +56,7 @@ __all__ = [
     # base
     'ArtistSerializer',
     'AlbumSerializer',
+    'AlbumDetailSerializer',
     'TagSerializer',
     'AiInfoSerializer',
     # music
