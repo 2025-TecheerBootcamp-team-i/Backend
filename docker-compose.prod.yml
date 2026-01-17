@@ -1,19 +1,20 @@
 services:
   # Django 백엔드 애플리케이션 (프로덕션용 이미지)
   backend:
-    image: hhyuninu/2025_techeer_team_i:1.0.39
+    image: hhyuninu/2025_techeer_team_i:latest
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
     ports:
       - "8000:8000"
     environment:
-      # 프로덕션 환경 변수 (Portainer에서 설정하거나 .env 파일 사용)
-      - POSTGRES_DB=music_db
-      - POSTGRES_USER=music_user
-      - POSTGRES_PASSWORD=music_password
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
+      # RDS 연결 정보 (Portainer에서 실제 RDS 값으로 변경 필요)
+      - SQL_ENGINE=django_prometheus.db.backends.postgresql
+      - SQL_DATABASE=music_db
+      - SQL_USER=admin
+      - SQL_PASSWORD=your_rds_password
+      - SQL_HOST=your-rds-endpoint.rds.amazonaws.com
+      - SQL_PORT=5432
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
     depends_on:
-      - db
       - rabbitmq
     labels:
       - traefik.enable=true
@@ -24,24 +25,6 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
-
-  # PostgreSQL 데이터베이스
-  db:
-    image: postgres:18
-    volumes:
-      - postgres_data:/var/lib/postgresql
-    environment:
-      - POSTGRES_USER=music_user
-      - POSTGRES_PASSWORD=music_password
-      - POSTGRES_DB=music_db
-    networks:
-      - ubuntu_gitops-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U music_user -d music_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # RabbitMQ 메시지 브로커 (Celery용)
   rabbitmq:
@@ -54,17 +37,18 @@ services:
 
   # Celery 워커 (비동기 작업 처리)
   celery:
-    image: hhyuninu/2025_techeer_team_i:1.0.39
+    image: hhyuninu/2025_techeer_team_i:latest
     command: celery -A config worker -l info
     environment:
-      - POSTGRES_DB=music_db
-      - POSTGRES_USER=music_user
-      - POSTGRES_PASSWORD=music_password
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
+      # RDS 연결 정보 (backend와 동일하게 설정)
+      - SQL_ENGINE=django_prometheus.db.backends.postgresql
+      - SQL_DATABASE=music_db
+      - SQL_USER=admin
+      - SQL_PASSWORD=your_rds_password
+      - SQL_HOST=your-rds-endpoint.rds.amazonaws.com
+      - SQL_PORT=5432
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
     depends_on:
-      - db
       - rabbitmq
     networks:
       - ubuntu_gitops-network
@@ -72,7 +56,7 @@ services:
 
   # Flower (Celery 모니터링)
   flower:
-    image: hhyuninu/2025_techeer_team_i:1.0.39
+    image: hhyuninu/2025_techeer_team_i:latest
     command: celery -A config flower --port=5555
     ports:
       - "5555:5555"
@@ -84,9 +68,6 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
-
-volumes:
-  postgres_data:
 
 networks:
   ubuntu_gitops-network:
