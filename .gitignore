@@ -39,3 +39,4 @@ static_root/
 # Docker
 # =============================================
 *.log
+.env.production
