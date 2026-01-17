@@ -16,6 +16,7 @@ from .views import (
     ArtistTracksView,
     ArtistAlbumsView,
     AlbumDetailView,
+    PopularArtistsView,
     ErrorTestView,
     DatabaseQueryTestView,
     # 사용자 통계
@@ -62,6 +63,10 @@ urlpatterns = [
     # GET /api/v1/tracks/{music_id}/play
     path('tracks/<int:music_id>/play', MusicPlayView.as_view(), name='music-play'),
 
+    # 인기 아티스트 목록 조회
+    # GET /api/v1/artists/popular?limit=7
+    path('artists/popular', PopularArtistsView.as_view(), name='popular-artists'),
+    
     # 아티스트 단일 조회
     # GET /api/v1/artists/{artist_id}/
     path('artists/<int:artist_id>/', ArtistDetailView.as_view(), name='artist-detail'),
