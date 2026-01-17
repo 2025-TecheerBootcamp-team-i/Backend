@@ -57,3 +57,8 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:${{ steps.set_tag.outputs.DOCKER_IMAGE_TAG }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:latest
+
+      - name: Deploy to Portainer via Webhook
+        if: success()
+        run: |
+          curl -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
