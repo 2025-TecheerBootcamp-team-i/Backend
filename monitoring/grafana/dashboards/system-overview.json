@@ -1,10 +1,14 @@
 {
+  "uid": "bd6696bc-44cb-47b5-be05-ea33367d6a5d",
   "title": "System Overview",
   "tags": ["overview", "system", "infrastructure"],
   "timezone": "browser",
   "schemaVersion": 38,
   "version": 1,
   "refresh": "30s",
+  "templating": {
+    "list": []
+  },
   "panels": [
     {
       "id": 1,
