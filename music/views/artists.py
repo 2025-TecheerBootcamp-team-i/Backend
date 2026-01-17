@@ -7,9 +7,12 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema
 
-from ..models import Artists, Music, Albums
+from ..models import Artists, Music, Albums, PlayLogs
 from ..serializers import ArtistSerializer
 from ..serializers.base import AlbumDetailSerializer
+from django.db.models import Count
+from drf_spectacular.utils import OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 
 class ArtistDetailView(APIView):
@@ -157,7 +160,7 @@ class ArtistAlbumsView(APIView):
                 "album_image": album.album_image if album.album_image else None,
             })
 
-            return Response(albums_data, status=status.HTTP_200_OK)
+        return Response(albums_data, status=status.HTTP_200_OK)
 
 
 class AlbumDetailView(APIView):
@@ -193,4 +196,66 @@ class AlbumDetailView(APIView):
 
         serializer = AlbumDetailSerializer(album)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PopularArtistsView(APIView):
+    """
+    인기 아티스트 목록 조회
+
+    - GET /api/v1/artists/popular?limit=7
+    """
+
+    permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="인기 아티스트 목록 조회",
+        description="PlayLogs 기반 재생 횟수로 정렬된 인기 아티스트 목록 조회",
+        parameters=[
+            OpenApiParameter(
+                name='limit',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='반환할 인기 아티스트 수 (기본값: 7)',
+                required=False,
+                default=7
+            )
+        ],
+        tags=['아티스트']
+    )
+
+    def get(self, request):
+        """
+        PlayLogs의 재생 기록을 기반으로 인기 아티스트 목록을 조회합니다.
+        
+        - PlayLogs -> Music -> Artists 조인
+        - 재생 횟수(play_count) 기준으로 정렬
+        """
+        limit = int(request.query_params.get('limit', 7))
+        
+        # PlayLogs에서 재생 기록을 기반으로 아티스트별 재생 횟수 집계
+        # PlayLogs -> Music -> Artists 조인
+        popular_artists = PlayLogs.objects.filter(
+            is_deleted__in=[False, None],
+            music__is_deleted__in=[False, None],
+            music__artist__is_deleted__in=[False, None]
+        ).values(
+            'music__artist__artist_id',
+            'music__artist__artist_name',
+            'music__artist__artist_image'
+        ).annotate(
+            play_count=Count('play_log_id')
+        ).order_by('-play_count')[:limit]
+        
+        # 결과를 Serializer 형식으로 변환
+        artists_data = []
+        for idx, artist_stat in enumerate(popular_artists, 1):
+            artists_data.append({
+                'rank': idx,
+                'artist_id': artist_stat['music__artist__artist_id'],
+                'artist_name': artist_stat['music__artist__artist_name'],
+                'image_small_circle': artist_stat['music__artist__artist_image'],
+                'play_count': artist_stat['play_count']
+            })
+        
+        return Response(artists_data, status=status.HTTP_200_OK)
 
