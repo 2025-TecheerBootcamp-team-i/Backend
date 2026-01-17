@@ -1,0 +1,21 @@
+{
+  "Records": [
+    {
+      "eventVersion": "2.1",
+      "eventSource": "aws:s3",
+      "awsRegion": "ap-northeast-2",
+      "eventTime": "2024-01-01T00:00:00.000Z",
+      "eventName": "ObjectCreated:Put",
+      "s3": {
+        "bucket": {
+          "name": "your-bucket-name",
+          "arn": "arn:aws:s3:::your-bucket-name"
+        },
+        "object": {
+          "key": "media/images/artists/original/test_artist.jpg",
+          "size": 1024
+        }
+      }
+    }
+  ]
+}
