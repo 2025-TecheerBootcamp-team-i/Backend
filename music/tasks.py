@@ -1,4 +1,4 @@
-"""
+﻿"""
 Celery 비동기 작업 정의 (AI 음악 생성, 차트 계산, 데이터 정리)
 """
 import time
@@ -19,7 +19,6 @@ from .services import WikidataService, LRCLIBService, DeezerService, LyricsOvhSe
 logger = logging.getLogger(__name__)
 
 
-<<<<<<< HEAD
 @shared_task(bind=True)
 def test_task(self, message: str = "테스트 메시지", delay_seconds: int = 1):
     """

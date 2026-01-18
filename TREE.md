@@ -38,6 +38,8 @@ Backend/
 │   │   ├── search.py        # 검색 관련 (MusicSearch)
 │   │   ├── music.py         # 음악 상세 관련 (MusicDetail)
 │   │   ├── artists.py       # 아티스트 관련 (ArtistDetail, ArtistTracks, ArtistAlbums)
+│   │   ├── playlogs.py      # 재생 기록 관련 (PlayLog)
+│   │   ├── charts.py        # 차트 관련 (Chart 조회)
 │   │   └── legacy.py        # 레거시 함수 기반 Views
 │   │
 │   ├── 📂 services/         # 외부 API 서비스
@@ -126,9 +128,9 @@ Backend/
 - [x] **Phase 3-1**: iTunes API 통합 (검색 우선 구조)
 - [x] **앱 모듈화**: views/, serializers/, services/ 폴더 구조화
 - [x] **Phase 3-2-1**: AI 음악 생성 (Suno API) 및 비동기 작업 (Celery)
+- [x] **Phase 4**: 차트 API 구현 (실시간/일일/AI 차트)
 - [x] **모니터링 시스템**: Prometheus, Grafana, Loki 통합 모니터링 구축
 - [ ] **Phase 3-2-2**: 외부 API (LRCLIB) 통합
-- [ ] **Phase 4**: 데이터 시각화 및 최적화 (play_log, 차트)
 - [ ] **Phase 5**: 클라우드 이관 (AWS RDS, MQ, EC2)
 
 ## 📝 주요 변경사항
