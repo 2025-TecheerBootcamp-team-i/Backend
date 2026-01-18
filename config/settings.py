@@ -255,6 +255,49 @@ CORS_ALLOW_HEADERS = [
 # drf-spectacular (Swagger/OpenAPI) 설정
 # ==============================================
 # API 문서 자동 생성 도구의 상세 설정
+def spectacular_preprocessing_hook(endpoints):
+    """
+    drf-spectacular preprocessing hook
+    api/music 경로의 엔드포인트 태그를 'Music API'로 통일
+    """
+    result = []
+    for path, path_regex, method, callback in endpoints:
+        # api/music 경로인 경우 태그를 'Music API'로 변경
+        if path.startswith('/api/music/'):
+            # callback에서 extend_schema 정보 확인
+            if hasattr(callback, 'cls'):
+                view_class = callback.cls
+                # extend_schema 데코레이터 정보는 여기서 접근하기 어려우므로
+                # 실제로는 view를 직접 수정하지 않고, 스키마 생성 후 처리
+                pass
+        result.append((path, path_regex, method, callback))
+    return result
+
+
+def spectacular_postprocessing_hook(result, generator, request, public):
+    """
+    drf-spectacular postprocessing hook
+    - api/music 경로의 operation 태그를 'Music API'로 변경
+    - /music/ 경로의 operation 태그를 '웹'으로 변경
+    """
+    # paths에서 경로별로 태그 변경
+    if 'paths' in result:
+        for path, methods in result['paths'].items():
+            # /api/music/로 시작하는 경로 → 'Music API' 태그
+            if path.startswith('/api/music/'):
+                for method in methods.values():
+                    if isinstance(method, dict) and 'tags' in method:
+                        if method['tags']:
+                            method['tags'] = ['Music API']
+            # /music/로 시작하는 경로 → '웹' 태그 (단, /music/로 시작하지만 /music/api/ 같은 것은 제외)
+            elif path.startswith('/music/') and not path.startswith('/music/api/'):
+                for method in methods.values():
+                    if isinstance(method, dict) and 'tags' in method:
+                        if method['tags']:
+                            method['tags'] = ['웹']
+    return result
+
+
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Music Streaming & AI Generation API',
     'DESCRIPTION': '음악 스트리밍 및 AI 음악 생성 플랫폼 Backend API',
@@ -263,6 +306,24 @@ SPECTACULAR_SETTINGS = {
     # JWT 인증 스키마 설정
     'COMPONENT_SPLIT_REQUEST': True,
     'SCHEMA_PATH_PREFIX': '/api/v1/',
+    # 태그 순서 정의 (Swagger UI에서 태그가 이 순서로 표시됨)
+    'TAGS': [
+        {'name': '웹'},
+        {'name': 'Music API'},
+        {'name': '인증'},
+        {'name': '검색'},
+        {'name': '음악 상세'},
+        {'name': '음악 재생'},
+        {'name': '좋아요'},
+        {'name': '아티스트'},
+        {'name': '사용자 통계'},
+        {'name': '플레이리스트'},
+        {'name': '테스트'},
+    ],
+    # api/music 경로의 태그를 'Music API'로 통일
+    'POSTPROCESSING_HOOKS': [
+        'config.settings.spectacular_postprocessing_hook',
+    ],
 }
 
 # ==============================================

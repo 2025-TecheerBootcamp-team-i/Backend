@@ -97,12 +97,31 @@ class ArtistTracksView(APIView):
                 seconds = track.duration % 60
                 duration_str = f"{minutes}:{seconds:02d}"
 
+            # 앨범 이미지: image_square가 있으면 사용, 없으면 album_image를 리사이징 URL로 변환
+            album_image = None
+            if track.album:
+                if track.album.image_square:
+                    album_image = track.album.image_square
+                elif track.album.album_image:
+                    # 원본 URL을 리사이징 URL로 변환
+                    # media/images/albums/original/xxx.jpg -> media/images/albums/square/220x220/xxx.jpg
+                    original_url = track.album.album_image
+                    if '/original/' in original_url:
+                        # 파일명 추출 및 확장자 변경
+                        filename = original_url.split('/')[-1]
+                        filename_without_ext = filename.rsplit('.', 1)[0]
+                        square_filename = f"{filename_without_ext}.jpg"
+                        # 경로 변환
+                        album_image = original_url.replace('/original/', '/square/220x220/').replace(filename, square_filename)
+                    else:
+                        album_image = track.album.album_image
+            
             tracks_data.append({
                 "id": str(track.music_id),
                 "title": track.music_name,
                 "album": track.album.album_name if track.album else "-",
                 "duration": duration_str,
-                "album_image": track.album.album_image if track.album and track.album.album_image else None,
+                "album_image": album_image,
             })
 
         return Response(tracks_data, status=status.HTTP_200_OK)
@@ -153,11 +172,30 @@ class ArtistAlbumsView(APIView):
             if album.created_at:
                 year = str(album.created_at.year)
 
+            # 앨범 이미지: image_square가 있으면 사용, 없으면 album_image를 리사이징 URL로 변환
+            if album.image_square:
+                album_image = album.image_square
+            elif album.album_image:
+                # 원본 URL을 리사이징 URL로 변환
+                # media/images/albums/original/xxx.jpg -> media/images/albums/square/220x220/xxx.jpg
+                original_url = album.album_image
+                if '/original/' in original_url:
+                    # 파일명 추출 및 확장자 변경
+                    filename = original_url.split('/')[-1]
+                    filename_without_ext = filename.rsplit('.', 1)[0]
+                    square_filename = f"{filename_without_ext}.jpg"
+                    # 경로 변환
+                    album_image = original_url.replace('/original/', '/square/220x220/').replace(filename, square_filename)
+                else:
+                    album_image = album.album_image
+            else:
+                album_image = None
+            
             albums_data.append({
                 "id": str(album.album_id),
                 "title": album.album_name or "-",
                 "year": year or "-",
-                "album_image": album.album_image if album.album_image else None,
+                "album_image": album_image if album_image else None,
             })
 
         return Response(albums_data, status=status.HTTP_200_OK)
@@ -175,7 +213,7 @@ class AlbumDetailView(APIView):
     @extend_schema(
         summary="앨범 상세 조회",
         description="앨범 ID로 단일 앨범 정보 및 수록곡 목록 조회",
-        tags=['앨범']
+        tags=['아티스트']
     )
 
     def get(self, request, album_id: int):

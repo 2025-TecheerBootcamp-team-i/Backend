@@ -7,10 +7,19 @@ from ..models import Artists, Albums, Tags, AiInfo
 
 class ArtistSerializer(serializers.ModelSerializer):
     """아티스트 정보 Serializer"""
+    artist_image = serializers.SerializerMethodField()
     
     class Meta:
         model = Artists
         fields = ['artist_id', 'artist_name', 'artist_image']
+    
+    def get_artist_image(self, obj):
+        """image_large_circle이 있으면 사용, 없으면 원본 artist_image 사용"""
+        # RDS에서 image_large_circle 필드 값을 직접 가져옴
+        if obj.image_large_circle:
+            return obj.image_large_circle
+        # 없으면 원본 artist_image 사용
+        return obj.artist_image
 
 
 class AlbumSerializer(serializers.ModelSerializer):
@@ -24,6 +33,7 @@ class AlbumSerializer(serializers.ModelSerializer):
 class AlbumDetailSerializer(serializers.ModelSerializer):
     """앨범 상세 조회용 Serializer (수록곡 목록 포함)"""
     artist = ArtistSerializer(read_only=True)
+    album_image = serializers.SerializerMethodField()
     tracks = serializers.SerializerMethodField()
     track_count = serializers.SerializerMethodField()
     total_duration = serializers.SerializerMethodField()
@@ -37,6 +47,14 @@ class AlbumDetailSerializer(serializers.ModelSerializer):
             'track_count', 'total_duration', 'total_duration_formatted',
             'like_count', 'tracks', 'created_at', 'updated_at'
         ]
+    
+    def get_album_image(self, obj):
+        """image_square가 있으면 사용, 없으면 원본 album_image 사용"""
+        # RDS에서 image_square 필드 값을 직접 가져옴
+        if obj.image_square:
+            return obj.image_square
+        # 없으면 원본 album_image 사용
+        return obj.album_image
     
     def get_tracks(self, obj):
         """앨범의 수록곡 목록 조회"""

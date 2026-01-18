@@ -29,6 +29,7 @@ class Albums(models.Model):
     artist = models.ForeignKey('Artists', models.DO_NOTHING, blank=True, null=True)
     album_name = models.CharField(max_length=200, blank=True, null=True)
     album_image = models.CharField(max_length=255, blank=True, null=True)
+    image_square = models.TextField(blank=True, null=True)  # 220x220 사각형 이미지
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     is_deleted = models.BooleanField(blank=True, null=True)
@@ -47,6 +48,9 @@ class Artists(models.Model):
     updated_at = models.DateTimeField(blank=True, null=True)
     is_deleted = models.BooleanField(blank=True, null=True)
     artist_image = models.TextField(blank=True, null=True)
+    image_large_circle = models.TextField(blank=True, null=True)  # 228x228 원형 이미지
+    image_small_circle = models.TextField(blank=True, null=True)  # 208x208 원형 이미지
+    image_square = models.TextField(blank=True, null=True)  # 220x220 사각형 이미지
 
     class Meta:
         managed = False

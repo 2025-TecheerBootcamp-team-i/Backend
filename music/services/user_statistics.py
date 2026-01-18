@@ -198,11 +198,12 @@ class UserStatisticsService:
             start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             query = query.filter(played_at__gte=start_date)
         
-        # 아티스트별 재생 횟수 집계
+        # 아티스트별 재생 횟수 집계 (image_square와 artist_image 모두 가져오기)
         artist_stats = query.values(
             'music__artist__artist_id',
             'music__artist__artist_name',
-            'music__artist__artist_image'
+            'music__artist__artist_image',
+            'music__artist__image_square'
         ).annotate(
             play_count=Count('play_log_id')
         ).order_by('-play_count')[:limit]
@@ -213,11 +214,13 @@ class UserStatisticsService:
         result = []
         for idx, stat in enumerate(artist_stats, 1):
             percentage = round((stat['play_count'] / total_plays * 100), 1) if total_plays > 0 else 0
+            # image_square가 있으면 사용, 없으면 artist_image 사용
+            artist_image = stat.get('music__artist__image_square') or stat.get('music__artist__artist_image')
             result.append({
                 'rank': idx,
                 'artist_id': stat['music__artist__artist_id'],
                 'artist_name': stat['music__artist__artist_name'],
-                'artist_image': stat['music__artist__artist_image'],
+                'artist_image': artist_image,
                 'play_count': stat['play_count'],
                 'percentage': percentage
             })
