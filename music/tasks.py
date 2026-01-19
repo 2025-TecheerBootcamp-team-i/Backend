@@ -745,11 +745,33 @@ def process_suno_webhook_task(self, webhook_data: dict):
         album = music.album
         if album:
             album.album_name = f"AI Generated - {music.music_name}"
-            if image_url:
+            
+            # 앨범 이미지를 S3로 업로드 (S3 URL이 아닐 때만)
+            if image_url and not is_s3_url(image_url):
+                try:
+                    logger.info(f"[Webhook 태스크] 앨범 이미지 S3 업로드 시작: album_id={album.album_id}")
+                    resized_urls = upload_image_to_s3(
+                        image_url=image_url,
+                        image_type='albums',
+                        entity_id=album.album_id,
+                        entity_name=album.album_name
+                    )
+                    # 원본 이미지 URL 저장 (Lambda가 리사이징한 사각형 이미지는 image_square 필드에 자동 저장됨)
+                    album.album_image = resized_urls.get('original')
+                    album.image_square = resized_urls.get('image_square')  # 220x220
+                    logger.info(f"[Webhook 태스크] 앨범 이미지 S3 업로드 완료: album_id={album.album_id}")
+                except Exception as upload_error:
+                    # S3 업로드 실패 시 원본 URL이라도 저장
+                    logger.warning(f"[Webhook 태스크] 앨범 이미지 S3 업로드 실패, 원본 URL 저장: {upload_error}")
+                    album.album_image = image_url
+            elif image_url:
+                # 이미 S3 URL이면 그대로 저장
                 album.album_image = image_url
+                logger.info(f"[Webhook 태스크] 앨범 이미지가 이미 S3 URL - 유지: album_id={album.album_id}")
+            
             album.updated_at = now
             album.save()
-            logger.info(f"[Webhook 태스크] Album 업데이트")
+            logger.info(f"[Webhook 태스크] Album 업데이트 완료: album_id={album.album_id}")
         
         logger.info(f"[Webhook 태스크] 완료: music_id={music.music_id}")
         
