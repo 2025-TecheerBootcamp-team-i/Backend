@@ -158,6 +158,43 @@ CELERY_TIMEZONE = 'Asia/Seoul'
 CELERY_ENABLE_UTC = False
 
 # ==============================================
+# Celery Beat 스케줄 설정 (주기적 작업)
+# ==============================================
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    # 실시간 차트: 10분마다 갱신 (최근 3시간 집계)
+    'update-realtime-chart': {
+        'task': 'music.tasks.update_realtime_chart',
+        'schedule': crontab(minute='*/10'),  # 매 10분마다
+    },
+    
+    # 일일 차트: 매일 자정에 갱신 (전날 전체 집계)
+    'update-daily-chart': {
+        'task': 'music.tasks.update_daily_chart',
+        'schedule': crontab(hour=0, minute=0),  # 매일 00:00
+    },
+    
+    # AI 차트: 매일 자정에 갱신 (전날 AI 곡만 집계)
+    'update-ai-chart': {
+        'task': 'music.tasks.update_ai_chart',
+        'schedule': crontab(hour=0, minute=5),  # 매일 00:05 (일일 차트와 약간 시차)
+    },
+    
+    # 재생 기록 정리: 매일 새벽 2시 (90일 이전 삭제)
+    'cleanup-old-playlogs': {
+        'task': 'music.tasks.cleanup_old_playlogs',
+        'schedule': crontab(hour=2, minute=0),  # 매일 02:00
+    },
+    
+    # 실시간 차트 정리: 매일 새벽 3시 (7일 이전 삭제)
+    'cleanup-old-realtime-charts': {
+        'task': 'music.tasks.cleanup_old_realtime_charts',
+        'schedule': crontab(hour=3, minute=0),  # 매일 03:00
+    },
+}
+
+# ==============================================
 # Django REST Framework 설정
 # ==============================================
 # REST API의 기본 인증 및 권한 설정을 정의합니다.

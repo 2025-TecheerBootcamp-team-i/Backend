@@ -1,0 +1,329 @@
+### Backend PRD 프롬프트
+
+- **Never Overwhelm:** 절대 한 번에 방대한 양의 코드를 쏟아내지 마십시오. 한 번의 답변에는 **하나의 기능(또는 파일 1~2개)**만 집중해서 다룹니다.
+- **Explain First, Code Later:** 코드를 작성하기 전에, **"왜 이 코드가 필요한지", "어떤 로직으로 돌아가는지"**를 먼저 설명하십시오.
+- **Wait for Confirmation:** 하나의 작업(Task)이 끝날 때마다 **"이 부분이 이해되셨나요? 다음 단계로 넘어갈까요?"**라고 물어보고, 나의 승인이 있을 때만 다음 단계로 진행하십시오.
+- **Local-First & Team Sync:** 우리는 **Tailscale을 통한 원격 DB 공유** 환경을 사용합니다. 팀원 간 설정 충돌이 없도록 `settings.py`나 `.env` 설정 시 주의사항을 꼼꼼히 체크해 주십시오.
+
+### 1. 요약 (Executive Summary)
+
+- **Concept:** 실제 아티스트의 음악 정보와 사용자가 AI로 생성한 음악을 하나의 플랫폼에서 자연스럽게 소비하고 공유하는 서비스.
+- **Key Value:** 데이터 분석이나 AI 기능이 있다고 해서 기본기를 놓치지 않음. **완성도 높은 스트리밍 환경**을 기반으로, 음악 데이터를 시각적으로 즐기고(Looking), 필요 시 나만의 음악을 생성(Creating)하는 확장된 경험을 제공.
+- **현재 상태 (2026년 1월):**
+  - ✅ **Core 스트리밍 기능 완료**: iTunes API 기반 검색, 30초 미리듣기, 플레이리스트 관리.
+  - ✅ **차트 및 통계 시스템 구축**: 실시간/일간/AI 차트, 사용자 청취 통계 분석.
+  - ✅ **인프라 구축**: Docker 기반 개발 환경, 프로덕션 배포 파이프라인, 모니터링 대시보드.
+  - 🔜 **AI 음악 생성**: LangChain + Suno 연동 개발 예정.
+
+### 2. 문제 정의 & 맥락 (Problem Statement & Context)
+
+- **Context:** 음악을 듣는 사람(Listener)과 만드는 사람(Creator)의 경계가 흐려지고 있음. 사용자는 하나의 플랫폼에서 기성곡을 즐기면서 동시에 자신만의 창작 욕구도 해소하고 싶어 함.
+
+### 3. 목표, 비목표 (Goals, Non-Goals)
+
+- **Goals:**
+    - ✅ **안정적인 음악 스트리밍 및 검색 기능 구현 (Core)** - iTunes API 기반 검색 및 30초 미리듣기 제공.
+    - ✅ **개인 플레이리스트 생성, 관리 및 저장 기능 제공** - CRUD 완료, 좋아요 기능 포함.
+    - ✅ **곡/앨범/아티스트에 대한 데이터 시각화(차트) 페이지 제공** - 실시간/일간/AI 차트 구현 완료.
+    - ✅ **사용자 청취 통계 및 분석 기능** - 청취 시간, 선호 장르/아티스트/태그 통계 제공.
+    - 🔜 **LangChain(Llama)과 Suno를 활용한 간편한 AI 음악 생성 (서브 기능)** - 개발 예정.
+- **Non-Goals:**
+    - AI 음악 생성이 메인 서비스가 되는 것 (스트리밍 품질이 최우선).
+    - 복잡한 DAW 수준의 편집 기능 제공.
+    - 복잡한 AI 생성 과정(파라미터 튜닝 등)을 사용자에게 노출하는 것 (사용자는 키워드 입력만 함).
+
+### 4. 페르소나 & JTBD (Personas & Jobs To Be Done)
+
+- **Persona A (All-round Listener):** 
+  - **Job:** 기성곡을 즐겨 듣지만, 가끔은 내 기분에 딱 맞는, 세상에 없는 노래를 듣고 싶어 함.
+  - **현재 제공 기능:** ✅ iTunes 기반 검색 및 재생, 플레이리스트 생성. 🔜 AI 음악 생성 예정.
+- **Persona B (Rank Watcher):** 
+  - **Job:** 단순히 현재 가장 인기 있는 곡이 무엇인지 조회수 기반의 순위를 확인하고 유행을 따라가고 싶어 함.
+  - **현재 제공 기능:** ✅ 실시간/일간 차트 조회, 인기 아티스트 목록.
+- **Persona C (Data Insight Seeker):** 
+  - **Job:** 단순 순위를 넘어, 제공된 데이터셋(장르 분포, 무드, 청취 패턴 등)을 시각화된 그래프나 통계로 분석하고 뜯어보는 것을 즐김.
+  - **현재 제공 기능:** ✅ 내 청취 통계 (시간별 분석, 선호 장르/아티스트/태그), AI 곡 차트.
+
+### 5. 주요 사용 사례 & 사용자 스토리 (Top Use Cases & User Stories)
+
+- **Story 1 (Music Discovery & Playback):** ✅ **구현 완료**
+  - 사용자는 iTunes 검색으로 아이유의 노래를 찾아 30초 미리듣기로 확인한 후, 플레이리스트에 추가하여 재생한다.
+  - 아티스트 상세 페이지에서 인기곡 목록과 앨범 정보를 확인할 수 있다.
+- **Story 2 (Chart & Statistics):** ✅ **구현 완료**
+  - 사용자는 실시간 차트를 확인하여 현재 인기곡 Top 100을 조회하고, 차트에서 바로 재생할 수 있다.
+  - 내 통계 페이지에서 청취 시간, 선호 장르, 가장 많이 들은 아티스트를 확인한다.
+- **Story 3 (Playlist Management):** ✅ **구현 완료**
+  - 사용자는 "출근길 플레이리스트"를 생성하고, 좋아하는 곡들을 추가한다.
+  - 마음에 드는 곡에 좋아요를 표시하고, 좋아요 목록을 모아서 볼 수 있다.
+- **Story 4 (AI Creation):** 🔜 **개발 예정**
+  - "신나는 여름 댄스곡"이라고 입력하면 AI가 알아서 곡을 생성해주고, 복잡한 설정 없이 결과물을 바로 내 라이브러리에 저장한다.
+  - AI로 생성한 곡들만 모아보는 AI 차트를 확인할 수 있다.
+
+### **6. 프로젝트 구현 로드맵 (Backend Implementation Roadmap)**
+
+개발은 **"로컬 우선(Local-First)"** 전략으로 진행하되, 최종적으로 **AWS 클라우드 환경으로의 무중단 이관**을 목표로 합니다.
+
+- **Phase 1: 로컬 올인원 환경 구축 (Local All-in-One)** ✅ **완료**
+    - **목표:** `docker-compose up` 명령어 하나로 백엔드, DB, 메시지 큐, 비동기 워커가 모두 정상 작동하는 개발 환경 구축.
+    - **완료:** `Dockerfile` 및 `docker-compose.yml` 작성 (PostgreSQL 15, RabbitMQ 3-management 이미지 사용).
+    - **완료:** Django DB 연결(`dj_database_url` 활용) 및 Celery Broker 설정.
+    - **완료:** 환경 변수(`.env`, `.env.production`) 기반 설정 관리.
+- **Phase 2: 인증 및 핵심 도메인** ✅ **완료**
+    - **완료:** User 모델 및 JWT 인증(SimpleJWT) 구현 (회원가입, 로그인, 토큰 재발급).
+    - **완료:** Music, Album, Artist, Playlist 모델 설계 및 CRUD API 구현.
+    - **완료:** S3 연동 (이미지 자동 업로드 및 리사이징 포함).
+    - **완료:** 음악 좋아요, 플레이리스트 좋아요 기능.
+- **Phase 3: 외부 API 및 비동기 작업 연동** ✅ **완료**
+    - **완료:** iTunes API 기반 검색 및 데이터 수집 (30초 미리듣기).
+    - **완료:** LRCLIB API 가사 데이터 연동.
+    - **완료:** 아티스트 이미지 자동 수집 (Wikipedia).
+    - **완료:** Celery를 이용한 비동기 작업 처리 (이미지 처리, 데이터 수집).
+- **Phase 4: 데이터 시각화 및 최적화** ✅ **완료**
+    - **완료:** 청취 기록(`play_logs`) 적재 시스템.
+    - **완료:** 차트 시스템 구현 (실시간/일간/AI 차트).
+    - **완료:** 사용자 통계 API (재생 시간, 선호 장르/아티스트/태그, AI 생성 통계).
+- **Phase 5: 클라우드 인프라 이관 (Cloud Migration & Production)** 🚧 **진행 중**
+    - **완료:** 프로덕션 환경 설정 (`.env.production`).
+    - **완료:** Docker Compose 프로덕션 파일 작성 (`docker-compose.prod.yml`).
+    - **완료:** Portainer Webhook 기반 자동 배포 시스템.
+    - **완료:** Grafana + Prometheus 모니터링 대시보드 구축.
+    - **진행 중:** AWS RDS PostgreSQL 이관.
+    - **진행 중:** Amazon MQ (RabbitMQ) 설정.
+    - **대기 중:** VPN(WireGuard/Tailscale)을 통한 외부 GPU 워커 연결.
+- **Phase 6: AI 음악 생성 기능** 🔜 **예정**
+    - **대기 중:** LangChain + Llama 프롬프트 구조화.
+    - **대기 중:** Suno AI API 연동 및 음악 생성 파이프라인.
+    - **대기 중:** AI 생성 작업 관리 API (작업 요청, 상태 조회, 취소).
+
+### 7. 범위 & 우선순위 (Scope & Prioritization)
+
+- **P1 (Should Have - 핵심 구현)** ✅ **대부분 완료**
+    - ✅ **User System:** 회원가입, 로그인 (JWT 인증).
+    - ✅ **Streaming Core:** 음악 검색, 리스트 출력, 재생.
+    - ✅ **Data Management:**
+        - 이미지/음원 파일 -> AWS S3 업로드 (자동 리사이징 포함).
+        - 파일 경로 및 메타데이터 -> PostgreSQL 저장.
+        - **기성곡 데이터:** iTunes API 활용 (30초 미리듣기), LRCLIB API를 활용한 가사데이터.
+        - **아티스트 이미지:** Wikipedia 자동 수집 및 저장.
+    - ✅ **Charts & Statistics:** 차트 시스템 (실시간/일간/AI), 사용자 통계 API.
+    - 🔜 **AI Pipeline:** AI 음악 생성 요청(Prompt) -> Llama 구조화 -> Suno 생성 -> 결과 반환.
+    - ✅ **Async Processing:** Celery를 이용한 비동기 작업 처리 (이미지 처리, 데이터 수집).
+- **P2 (Could Have)** ✅ **완료**
+    - ✅ 노래 좋아요(Like) 기능 (User-Music N:M 관계 테이블 구현).
+    - ✅ 플레이리스트 좋아요 기능.
+    - ✅ 내가 좋아요 표시한 곡 목록 조회.
+- **P3 (Nice to Have)** 🔜 **예정**
+    - 🔜 내 플레이리스트 다른 사람에게 공개 (is_public 플래그 활용).
+    - 🔜 공개 플레이리스트 탐색 및 구독 기능.
+    - 🔜 사용자 프로필 페이지 및 팔로우 시스템.
+
+### 8. 앱플로우 & 정보구조 (App Flow & IA)
+
+- **Main Flow:** 
+  - Home (차트/인기 아티스트) -> Search (통합 검색) -> Search Results (곡/아티스트/앨범) -> Detail (상세 정보) -> Play (재생) -> Statistics (내 통계)
+  - Playlist -> Create/Edit -> Add Songs -> Share (예정)
+- **Chart Flow:** 
+  - Charts Tab -> Select Type (실시간/일간/AI) -> View Rankings -> Play from Chart
+- **Statistics Flow:**
+  - My Page -> 청취 통계 -> 선호 장르/아티스트/태그 분석 -> AI 생성 이력 (예정)
+- **Sub Flow (AI):** 🔜 AI Tab -> Simple Prompt Input -> Processing (Waiting in Queue) -> Result List -> Save to Playlist
+
+### 9. 플랫폼 & 기술결정 (Platform & Tech Decisions)
+
+- **Frontend:** React, TypeScript, Vercel.
+- **Backend:** **Django 5.1**, Django REST Framework (DRF), Gunicorn (WSGI), drf-spectacular (API 문서화).
+- **Infra Core:**
+    - **Main Server (AWS EC2):** Django API, Traefik (리버스 프록시), Prometheus + Grafana (모니터링) 구동. (t3.small 권장)
+    - **Message Queue:** **RabbitMQ** (로컬 개발), **Amazon MQ** (프로덕션 예정).
+    - **Database:** **PostgreSQL 15** (로컬 개발 및 Tailscale 공유), **AWS RDS for PostgreSQL** (프로덕션 예정).
+    - **Object Storage:** **AWS S3** (이미지 및 음원 파일 저장, Pillow 기반 자동 리사이징).
+    - **Deployment:** Docker + Docker Compose, Portainer Webhook 기반 자동 배포.
+- **AI Infra (Hybrid Cloud):**
+    - **External GPU Machine:** 고성능 로컬 워크스테이션에서 Llama(`llama3.1:8b-instruct-q8_0`) 및 LangChain 구동.
+    - **Connectivity:** **Tailscale VPN**을 통해 팀원 간 DB 및 서비스 공유, AWS VPC와 외부 GPU 머신 연결 예정.
+- **AI Stack:** LangChain (Prompt Engineering), Suno AI API, Ollama (Llama 로컬 구동).
+- **Monitoring & Observability:**
+    - **Metrics:** Prometheus (시계열 메트릭 수집) + Grafana (시각화 대시보드).
+    - **Error Tracking:** Sentry (프론트엔드/백엔드 에러 추적) 예정.
+    - **Logging:** Django 내장 로깅 시스템.
+
+### **10. 데이터 모델 및 관계 (Data Model & ERD)**
+
+- **사용자 및 취향 (User & Preferences)**
+    - **users**: `user_id` (PK), `email`, `password`, `nickname`, `created_at`, `updated_at`, `is_deleted`
+    - **genres**: `genre_id` (PK), `genre_name`
+    - **user_genres**: `ug_id` (PK), `user_id` (FK), `genre_id` (FK), `created_at`
+- **음악 및 메타데이터 (Music Core)**
+    - **music**: `music_id` (PK), `user_id` (FK), `artist_id` (FK), `album_id` (FK), `genre_id` (FK), `music_name`, `is_ai`, `audio_url`, `duration`, `lyrics`, `valence` (NUMERIC), `arousal` (NUMERIC), `itunes_id`, `created_at`, `updated_at`, `is_deleted`
+    - **artists**: `artist_id` (PK), `artist_name`, `artist_image` ✨ (TEXT), `created_at`, `updated_at`, `is_deleted`
+    - **albums**: `album_id` (PK), `artist_id` (FK), `album_name`, `album_image`, `created_at`, `updated_at`, `is_deleted`
+    - **tags**: `tag_id` (PK), `tag_name`
+    - **music_tags**: `mt_id` (PK), `music_id` (FK), `tag_id` (FK), `created_at`
+- **플레이리스트 (Playlist System)**
+    - **playlists**: `playlist_id` (PK), `user_id` (FK), `title`, `is_public`, `created_at`, `updated_at`, `is_deleted`
+    - **playlist_items**: `item_id` (PK), `music_id` (FK), `playlist_id` (FK), `order`, `created_at`, `updated_at`, `is_deleted`
+    - **playlist_likes**: `p_like_id` (PK), `user_id` (FK), `playlist_id` (FK), `created_at`
+- **상호작용 및 로그 (Interaction & Logs)**
+    - **music_likes**: `like_id` (PK), `user_id` (FK), `music_id` (FK), `created_at`
+    - **play_logs**: `play_log_id` (PK), `music_id` (FK), `user_id` (FK), `played_at`, `created_at`, `updated_at`, `is_deleted`
+    - **charts**: `chart_id` (PK), `music_id` (FK), `play_count`, `chart_date`, `rank`, `type` ✨ (realtime|daily|ai), `created_at`, `updated_at`, `is_deleted`
+    - **ai_info**: `aiinfo_id` (PK), `music_id` (FK), `task_id` ✨ (VARCHAR 100, indexed), `input_prompt`, `created_at`, `updated_at`, `is_deleted`
+- 테이블간 관계
+1. 사용자 (Users) 중심
+    - Users ↔ Playlists : `1 : N` (한 명이 여러 플리 생성)
+    - Users ↔ Music/Playlist_Likes : `1 : N` (한 명이 여러 번 좋아요)
+    - Users ↔ Play_Logs : `1 : N` (한 명이 여러 재생 기록)
+    - Users ↔ Users_Genre : `1 : N` (한 명이 여러 장르 선호)
+2. 음악 (Music) 중심
+    - Artists ↔ Music : `1 : N` (한 가수가 여러 곡)
+    - Albums ↔ Music : `1 : N` (한 앨범에 여러 곡)
+    - Genres ↔ Music : `1 : N` (한 장르에 여러 곡)
+    - Music ↔ AI_Info : `1 : 1` (곡당 하나의 AI 분석 정보)
+    - Music ↔ Charts : `1 : N` (곡당 여러 순위 기록)
+3. 다대다 (N:M) 연결 테이블
+    - Playlists ↔ Music : `N : M` (중간테이블: `playlist_items`)
+    - Music ↔ Tags : `N : M` (중간테이블: `music_tags`)
+
+---
+
+### **11. API 명세 (API Specifications)**
+
+> ✅ = 구현 완료 | 🚧 = 진행 중 | 🔜 = 예정
+
+- **Auth & User (인증 및 사용자)**
+    - ✅ `POST /api/v1/auth/users`: 회원가입
+    - ✅ `POST /api/v1/auth/tokens`: 로그인 (Access/Refresh 토큰 발급)
+    - ✅ `POST /api/v1/auth/refresh`: 토큰 재발급
+    - ✅ `DELETE /api/v1/auth/tokens`: 로그아웃
+    - ✅ `GET /api/v1/users/me`: 내 정보 조회
+    - ✅ `PATCH /api/v1/users/me`: 프로필 수정
+    - ✅ `GET /api/v1/users/me/likes/music`: 내가 좋아요 한 곡 목록 조회
+- **Music Search (외부 API 기반 검색)**
+    - ✅ `GET /api/v1/search`: 통합 검색 (iTunes/DB 통합)
+    - ✅ `GET /api/v1/tracks`: 곡 검색 및 목록 조회
+    - ✅ `GET /api/v1/tracks/{trackId}`: 곡 상세 조회
+    - ✅ `GET /api/v1/artists`: 아티스트 검색
+    - ✅ `GET /api/v1/artists/{artistId}`: 아티스트 상세 정보
+    - ✅ `GET /api/v1/artists/{artistId}/tracks`: 아티스트 인기 곡 목록
+    - ✅ `GET /api/v1/artists/popular`: 인기 아티스트 목록 (Top 50)
+    - ✅ `GET /api/v1/albums`: 앨범 검색
+    - ✅ `GET /api/v1/albums/{collectionId}`: 앨범 상세 정보
+    - ✅ `GET /api/v1/lyrics/{trackId}`: 가사 데이터 조회 (LRCLIB 연동)
+- **AI Music Generation (생성 및 작업 관리)** 🔜
+    - 🔜 `POST /api/v1/generations`: 음악 생성 작업 요청 (비동기 작업 시작)
+    - 🔜 `GET /api/v1/generations/{jobId}`: 특정 생성 작업 상태 및 결과 조회
+    - 🔜 `GET /api/v1/generations`: 전체 생성 작업 목록 조회
+    - 🔜 `DELETE /api/v1/generations/{jobId}`: 생성 작업 취소
+    - 🔜 `POST /api/v1/generations/cover`: 기존 음악 커버 생성
+    - 🔜 `POST /api/v1/generations/vocal`: 반주에 보컬 추가 생성
+    - 🔜 `POST /api/v1/cover/generations`: 커버 이미지 생성
+    - 🔜 `POST /api/v1/lyrics`: AI 가사 생성 요청
+- **Internal DB Tracks & Interaction (내부 데이터 및 소통)**
+    - ✅ `GET /api/v1/db/tracks`: 내부 DB 저장 곡 검색
+    - ✅ `GET /api/v1/db/tracks/{musicId}`: 음악 상세 및 태그 정보 조회
+    - ✅ `GET /api/v1/tracks/search/tags`: 태그 기반 음악 검색
+    - ✅ `POST /api/v1/music/{musicId}/likes`: 노래 좋아요 등록
+    - ✅ `DELETE /api/v1/music/{musicId}/likes`: 노래 좋아요 취소
+- **Playlist & History (라이브러리 관리)**
+    - ✅ `GET /api/v1/playlists`: 플레이리스트 목록 조회
+    - ✅ `GET /api/v1/playlists/{playlistId}`: 플레이리스트 단건 상세 조회
+    - ✅ `POST /api/v1/playlists`: 새 플레이리스트 생성
+    - ✅ `POST /api/v1/playlists/{playlistId}/items`: 곡 추가
+    - ✅ `DELETE /api/v1/playlists/items/{itemsId}`: 곡 삭제
+    - ✅ `POST /api/v1/playlists/{playlistId}/likes`: 플레이리스트 좋아요
+    - ✅ `POST /api/v1/playlogs/{musicId}`: 재생 기록 추가 (Log 생성)
+- **Charts & Statistics (데이터 인사이트)**
+    - ✅ `GET /api/v1/charts/{type}`: 차트 조회 (type: realtime|daily|ai)
+    - ✅ `GET /api/v1/statistics/me`: 내 청취 통계 요약
+    - ✅ `GET /api/v1/statistics/me/listening-time`: 청취 시간 통계
+    - ✅ `GET /api/v1/statistics/me/top-genres`: 선호 장르 통계
+    - ✅ `GET /api/v1/statistics/me/top-artists`: 선호 아티스트 통계
+    - ✅ `GET /api/v1/statistics/me/top-tags`: 선호 태그 통계
+    - ✅ `GET /api/v1/statistics/me/ai-generation`: AI 생성 통계
+
+### 12. 오프라인·동기화·캐싱 (Offline·Sync·Caching)
+
+- **Server Caching:** 
+  - ✅ 차트 데이터는 스냅샷 방식으로 `charts` 테이블에 저장하여 실시간 집계 부하 감소.
+  - 🚧 Django의 내장 캐시 시스템(Database Backend) 또는 메모리 캐시 활용 검토 중.
+  - 🔜 인기 검색어, 인기 아티스트 등 자주 조회되는 데이터 캐싱 예정.
+- **Browser:** 
+  - ✅ S3에 저장된 이미지는 CDN 또는 브라우저 캐싱(Cache-Control) 활용.
+  - ✅ iTunes API 썸네일은 외부 URL 직접 제공으로 캐싱 불필요.
+
+### 13. 보안·개인정보보호·컴플라이언스 (Security & Privacy)
+
+- ✅ **Authentication:** JWT 기반 인증 (SimpleJWT) 구현 완료.
+  - Access Token + Refresh Token 방식.
+  - 비밀번호는 Django 기본 해싱(PBKDF2) 사용.
+- ✅ **AWS S3:** 
+  - 이미지 및 음원 파일 업로드 (Public Read 설정).
+  - 🚧 Pre-signed URL 또는 Private 접근 전환 검토 중.
+- ✅ **API Security:** 
+  - CORS 설정 완료 (허용 Origin 관리).
+  - 🚧 Traefik을 통한 SSL/TLS 적용 및 Rate Limiting 설정 예정.
+- ✅ **Database:** 
+  - 환경 변수를 통한 DB 접속 정보 관리 (`.env` 파일).
+  - Tailscale VPN을 통한 안전한 DB 공유.
+- 🔜 **GDPR Compliance:** 
+  - 사용자 데이터 삭제 요청 처리 (Soft Delete 구현 완료, Hard Delete 정책 수립 예정).
+
+### 14. 성능목표 & 품질기준 (Performance SLOs)
+
+- ✅ **API Latency:** 일반적인 CRUD 작업(검색, 조회 등)은 500ms 이내 응답 목표 달성.
+  - 인증: ~100ms
+  - 음악 검색: ~300ms (iTunes API 의존)
+  - 플레이리스트 조회: ~150ms
+  - 차트 조회: ~200ms (인덱싱 최적화 완료)
+- ✅ **Database Performance:** 
+  - 차트 집계 쿼리 최적화 (music_id, type, chart_date 인덱싱).
+  - 재생 기록 저장 비동기 처리 검토 중.
+- ✅ **Image Optimization:** 
+  - S3 업로드 시 자동 리사이징 (썸네일: 300x300, 중형: 600x600).
+  - Pillow 라이브러리 기반 이미지 최적화.
+- 🔜 **AI Task Handling:** 사용자가 AI 생성 버튼을 누르면 **1초 이내**에 "작업 시작됨(202 Accepted)" 응답을 반환하여 UI 멈춤 방지 (실제 생성은 Celery 비동기로 처리).
+- ✅ **Streaming:** iTunes 30초 미리듣기 URL 직접 제공으로 재생 대기 시간 최소화.
+
+### 15. 분석&텔레메트리 (Analytics & Telemetry)
+
+- ✅ **Monitoring:** Prometheus(CPU/메모리) -> Grafana(그래프 시각화) 대시보드 구축 완료. (Main EC2 Docker Compose 내 구동)
+- 🔜 **Error Tracking:** Sentry(프론트엔드/백엔드 에러 추적) 예정.
+- ✅ **Data Insight:** 
+  - `play_logs` 테이블에 모든 재생 이력 기록 (사용자별, 곡별, 재생 시각).
+  - 차트 집계 배치 작업을 통해 `charts` 테이블 생성 (실시간/일간/AI 타입별).
+  - 사용자 통계 API를 통해 개인별 청취 패턴 분석 제공.
+- ✅ **API Documentation:** drf-spectacular 기반 Swagger UI 제공 (`/api/schema/swagger-ui/`).
+
+### 16. 수용기준&테스트계획 (Acceptance Criteria & Test Plan)
+
+- **Happy Path (현재 구현):** 
+  - ✅ 회원가입 -> 로그인 (JWT) -> 음악 검색 (iTunes) -> 곡 상세 조회 -> 재생 기록 저장
+  - ✅ 플레이리스트 생성 -> 곡 추가 -> 재생
+  - ✅ 차트 조회 (실시간/일간/AI)
+  - ✅ 내 통계 확인 (청취 시간, 선호 장르/아티스트)
+  - 🔜 AI 음악 생성 -> 내 보관함 저장 (개발 예정)
+- **Data Integrity:**
+  - ✅ `play_logs` 테이블에 모든 재생 이력 정확히 기록.
+  - ✅ 차트 배치 작업을 통해 `charts` 테이블 생성 및 순위 집계.
+  - 🚧 순위 변동폭 계산 로직 (이전 날짜 데이터와 비교) 단위 테스트 작성 예정.
+- **Performance:**
+  - ✅ API 응답 시간 500ms 이내 (일반 CRUD).
+  - ✅ 차트 조회 최적화 (인덱싱 및 쿼리 최적화).
+  - ✅ 이미지 자동 리사이징으로 S3 용량 최적화.
+
+### 17. 위험·가정·의존성 (Risks, Assumptions, Dependencies)
+
+- **현재 운영 상황:**
+  - ✅ Tailscale VPN을 통한 팀원 간 DB 공유 활성화 중.
+  - ✅ 로컬 개발 환경에서 Docker Compose 기반 통합 환경 구축 완료.
+  - ✅ 프로덕션 배포 환경 구성 (Portainer Webhook 자동 배포).
+- **Hybrid Cloud Risk (AI 기능):** 
+  - 🔜 VPN(외부망 연결) 상태가 불안정할 경우, AI 기능이 동작하지 않을 수 있음 -> 연결 끊김 시 "AI 서버 점검 중" 예외 처리 필수.
+- **External API Dependency:**
+  - ✅ iTunes API: 검색 및 30초 미리듣기 제공 (안정적).
+  - ✅ LRCLIB API: 가사 데이터 제공 (일부 곡은 가사 없을 수 있음).
+  - 🔜 Suno AI API: 지연 시 대기열 적체 가능성 -> RabbitMQ/Amazon MQ 모니터링 필요.
+- **Assumptions:**
+  - 개발 단계에서는 Tailscale을 통한 로컬 DB 공유 사용.
+  - 프로덕션 환경에서는 AWS RDS 및 Amazon MQ 사용 예정.
+  - 외부 GPU 머신은 AI 기능 개발 시 필요에 따라 가동.

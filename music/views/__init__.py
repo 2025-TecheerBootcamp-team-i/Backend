@@ -25,6 +25,12 @@ from .music import MusicDetailView, MusicPlayView
 # 아티스트 관련 Views
 from .artists import ArtistDetailView, ArtistTracksView, ArtistAlbumsView, AlbumDetailView, PopularArtistsView
 
+# 재생 기록 관련 Views
+from .playlogs import PlayLogView, PlayLogCreateView
+
+# 차트 관련 Views
+from .charts import ChartView
+
 # 사용자 통계 관련 Views
 from .statistics import (
     UserStatisticsView,
@@ -81,6 +87,11 @@ __all__ = [
     'ArtistAlbumsView',
     'AlbumDetailView',
     'PopularArtistsView',
+    # playlogs
+    'PlayLogView',
+    'PlayLogCreateView',
+    # charts
+    'ChartView',
     # statistics (사용자 통계)
     'UserStatisticsView',
     'UserListeningTimeView',
