@@ -12,6 +12,12 @@ from .base import (
     AiInfoSerializer,
 )
 
+# 아티스트 관련 Serializers
+from .artists import (
+    ArtistTrackSerializer,
+    ArtistAlbumSerializer,
+)
+
 # 음악 관련 Serializers
 from .music import (
     MusicDetailSerializer,
@@ -60,6 +66,17 @@ from .charts import (
     ChartResponseSerializer,
 )
 
+# AI 음악 생성 Serializers
+from .ai_music import (
+    MusicGenerateRequestSerializer,
+    MusicGenerateResponseSerializer,
+    MusicGenerateSimpleResponseSerializer,
+    TaskStatusSerializer,
+    MusicListSerializer as AiMusicListSerializer,
+    SunoTaskStatusRequestSerializer,
+    SunoTaskStatusResponseSerializer,
+)
+
 # 외부에서 사용 가능한 모든 클래스
 __all__ = [
     # base
@@ -68,6 +85,9 @@ __all__ = [
     'AlbumDetailSerializer',
     'TagSerializer',
     'AiInfoSerializer',
+    # artists
+    'ArtistTrackSerializer',
+    'ArtistAlbumSerializer',
     # music
     'MusicDetailSerializer',
     'MusicLikeSerializer',
@@ -98,4 +118,12 @@ __all__ = [
     'ChartMusicSerializer',
     'ChartItemSerializer',
     'ChartResponseSerializer',
+    # ai_music
+    'MusicGenerateRequestSerializer',
+    'MusicGenerateResponseSerializer',
+    'MusicGenerateSimpleResponseSerializer',
+    'TaskStatusSerializer',
+    'AiMusicListSerializer',
+    'SunoTaskStatusRequestSerializer',
+    'SunoTaskStatusResponseSerializer',
 ]

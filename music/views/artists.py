@@ -10,6 +10,7 @@ from drf_spectacular.utils import extend_schema
 from ..models import Artists, Music, Albums, PlayLogs
 from ..serializers import ArtistSerializer
 from ..serializers.base import AlbumDetailSerializer
+from ..serializers.artists import ArtistTrackSerializer, ArtistAlbumSerializer
 from django.db.models import Count
 from drf_spectacular.utils import OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
@@ -87,43 +88,14 @@ class ArtistTracksView(APIView):
             is_deleted__in=[False, None],
         ).select_related('album').order_by('-created_at')
 
-        # Serializer로 변환
-        tracks_data = []
-        for track in tracks:
-            # duration을 "mm:ss" 형식으로 변환
-            duration_str = "-"
-            if track.duration:
-                minutes = track.duration // 60
-                seconds = track.duration % 60
-                duration_str = f"{minutes}:{seconds:02d}"
-
-            # 앨범 이미지: image_square가 있으면 사용, 없으면 album_image를 리사이징 URL로 변환
-            album_image = None
-            if track.album:
-                if track.album.image_square:
-                    album_image = track.album.image_square
-                elif track.album.album_image:
-                    # 원본 URL을 리사이징 URL로 변환
-                    # media/images/albums/original/xxx.jpg -> media/images/albums/square/220x220/xxx.jpg
-                    original_url = track.album.album_image
-                    if '/original/' in original_url:
-                        # 파일명 추출 및 확장자 변경
-                        filename = original_url.split('/')[-1]
-                        filename_without_ext = filename.rsplit('.', 1)[0]
-                        square_filename = f"{filename_without_ext}.jpg"
-                        # 경로 변환
-                        album_image = original_url.replace('/original/', '/square/220x220/').replace(filename, square_filename)
-                    else:
-                        album_image = track.album.album_image
-            
-            tracks_data.append({
-                "id": str(track.music_id),
-                "title": track.music_name,
-                "album": track.album.album_name if track.album else "-",
-                "duration": duration_str,
-                "album_image": album_image,
-            })
-
+        # Serializer를 사용하여 데이터 변환
+        serializer = ArtistTrackSerializer(tracks, many=True)
+        
+        # id를 문자열로 변환 (기존 API 호환성 유지)
+        tracks_data = serializer.data
+        for track in tracks_data:
+            track['id'] = str(track['id'])
+        
         return Response(tracks_data, status=status.HTTP_200_OK)
 
 
@@ -164,40 +136,14 @@ class ArtistAlbumsView(APIView):
             is_deleted__in=[False, None],
         ).order_by('-created_at')
 
-        # Serializer로 변환
-        albums_data = []
-        for album in albums:
-            # created_at에서 연도 추출 (없으면 None)
-            year = None
-            if album.created_at:
-                year = str(album.created_at.year)
-
-            # 앨범 이미지: image_square가 있으면 사용, 없으면 album_image를 리사이징 URL로 변환
-            if album.image_square:
-                album_image = album.image_square
-            elif album.album_image:
-                # 원본 URL을 리사이징 URL로 변환
-                # media/images/albums/original/xxx.jpg -> media/images/albums/square/220x220/xxx.jpg
-                original_url = album.album_image
-                if '/original/' in original_url:
-                    # 파일명 추출 및 확장자 변경
-                    filename = original_url.split('/')[-1]
-                    filename_without_ext = filename.rsplit('.', 1)[0]
-                    square_filename = f"{filename_without_ext}.jpg"
-                    # 경로 변환
-                    album_image = original_url.replace('/original/', '/square/220x220/').replace(filename, square_filename)
-                else:
-                    album_image = album.album_image
-            else:
-                album_image = None
-            
-            albums_data.append({
-                "id": str(album.album_id),
-                "title": album.album_name or "-",
-                "year": year or "-",
-                "album_image": album_image if album_image else None,
-            })
-
+        # Serializer를 사용하여 데이터 변환
+        serializer = ArtistAlbumSerializer(albums, many=True)
+        
+        # id를 문자열로 변환 (기존 API 호환성 유지)
+        albums_data = serializer.data
+        for album in albums_data:
+            album['id'] = str(album['id'])
+        
         return Response(albums_data, status=status.HTTP_200_OK)
 
 
