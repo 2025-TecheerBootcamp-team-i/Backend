@@ -55,10 +55,8 @@ class UserStatisticsService:
             prev_month_end = None
         
         # 현재 기간 쿼리
-        query = PlayLogs.objects.filter(
-            user_id=user_id,
-            is_deleted=False
-        ).select_related('music')
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        query = PlayLogs.objects.filter(user_id=user_id).select_related('music')
         
         if start_date:
             query = query.filter(played_at__gte=start_date)
@@ -79,9 +77,9 @@ class UserStatisticsService:
         change_percent = 0.0
         
         if period == 'month' and prev_month_start and prev_month_end:
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
             prev_query = PlayLogs.objects.filter(
                 user_id=user_id,
-                is_deleted=False,
                 played_at__gte=prev_month_start,
                 played_at__lt=start_date
             )
@@ -128,9 +126,9 @@ class UserStatisticsService:
         """
         now = timezone.now()
         
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         query = PlayLogs.objects.filter(
             user_id=user_id,
-            is_deleted=False,
             music__genre__isnull=False
         ).exclude(music__genre='')
         
@@ -188,9 +186,9 @@ class UserStatisticsService:
         """
         now = timezone.now()
         
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         query = PlayLogs.objects.filter(
             user_id=user_id,
-            is_deleted=False,
             music__artist__isnull=False
         )
         
@@ -251,10 +249,8 @@ class UserStatisticsService:
         now = timezone.now()
         
         # PlayLogs에서 사용자가 들은 music_id 목록 추출
-        play_query = PlayLogs.objects.filter(
-            user_id=user_id,
-            is_deleted=False
-        )
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        play_query = PlayLogs.objects.filter(user_id=user_id)
         
         if period == 'month':
             start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -264,9 +260,9 @@ class UserStatisticsService:
         played_music_ids = play_query.values_list('music_id', flat=True)
         
         # 해당 음악들의 태그 집계
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         tag_stats = MusicTags.objects.filter(
-            music_id__in=played_music_ids,
-            is_deleted=False
+            music_id__in=played_music_ids
         ).values(
             'tag__tag_id',
             'tag__tag_key'
@@ -307,10 +303,10 @@ class UserStatisticsService:
         now = timezone.now()
         
         # AI 생성 음악은 Music 테이블에서 is_ai=True, user_id로 필터
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         query = Music.objects.filter(
             user_id=user_id,
-            is_ai=True,
-            is_deleted=False
+            is_ai=True
         )
         
         if period == 'month':

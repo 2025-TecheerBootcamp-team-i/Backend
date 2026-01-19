@@ -36,11 +36,8 @@ class ArtistDetailView(APIView):
         아티스트 ID(artist_id)로 단일 아티스트 정보를 조회합니다.
         """
         try:
-            # is_deleted가 False이거나 NULL인 아티스트만 조회
-            artist = Artists.objects.get(
-                artist_id=artist_id,
-                is_deleted__in=[False, None],
-            )
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+            artist = Artists.objects.get(artist_id=artist_id)
         except Artists.DoesNotExist:
             return Response(
                 {"detail": "아티스트를 찾을 수 없습니다."},
@@ -72,10 +69,8 @@ class ArtistTracksView(APIView):
         """
         # 아티스트 존재 여부 확인
         try:
-            artist = Artists.objects.get(
-                artist_id=artist_id,
-                is_deleted__in=[False, None],
-            )
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+            artist = Artists.objects.get(artist_id=artist_id)
         except Artists.DoesNotExist:
             return Response(
                 {"detail": "아티스트를 찾을 수 없습니다."},
@@ -83,10 +78,8 @@ class ArtistTracksView(APIView):
             )
 
         # 해당 아티스트의 곡 목록 조회 (앨범 정보 포함)
-        tracks = Music.objects.filter(
-            artist_id=artist_id,
-            is_deleted__in=[False, None],
-        ).select_related('album').order_by('-created_at')
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        tracks = Music.objects.filter(artist_id=artist_id).select_related('album').order_by('-created_at')
 
         # Serializer를 사용하여 데이터 변환
         serializer = ArtistTrackSerializer(tracks, many=True)
@@ -120,10 +113,8 @@ class ArtistAlbumsView(APIView):
         """
         # 아티스트 존재 여부 확인
         try:
-            artist = Artists.objects.get(
-                artist_id=artist_id,
-                is_deleted__in=[False, None],
-            )
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+            artist = Artists.objects.get(artist_id=artist_id)
         except Artists.DoesNotExist:
             return Response(
                 {"detail": "아티스트를 찾을 수 없습니다."},
@@ -131,10 +122,8 @@ class ArtistAlbumsView(APIView):
             )
 
         # 해당 아티스트의 앨범 목록 조회
-        albums = Albums.objects.filter(
-            artist_id=artist_id,
-            is_deleted__in=[False, None],
-        ).order_by('-created_at')
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        albums = Albums.objects.filter(artist_id=artist_id).order_by('-created_at')
 
         # Serializer를 사용하여 데이터 변환
         serializer = ArtistAlbumSerializer(albums, many=True)
@@ -167,11 +156,8 @@ class AlbumDetailView(APIView):
         앨범 ID(album_id)로 단일 앨범 정보 및 수록곡 목록을 조회합니다.
         """
         try:
-            # is_deleted가 False이거나 NULL인 앨범만 조회
-            album = Albums.objects.select_related('artist').get(
-                album_id=album_id,
-                is_deleted__in=[False, None],
-            )
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+            album = Albums.objects.select_related('artist').get(album_id=album_id)
         except Albums.DoesNotExist:
             return Response(
                 {"detail": "앨범을 찾을 수 없습니다."},
@@ -218,10 +204,10 @@ class PopularArtistsView(APIView):
         
         # PlayLogs에서 재생 기록을 기반으로 아티스트별 재생 횟수 집계
         # PlayLogs -> Music -> Artists 조인
+        # SoftDeleteManager가 자동으로 각 모델의 is_deleted=False인 레코드만 조회
         popular_artists = PlayLogs.objects.filter(
-            is_deleted__in=[False, None],
-            music__is_deleted__in=[False, None],
-            music__artist__is_deleted__in=[False, None]
+            music__isnull=False,
+            music__artist__isnull=False
         ).values(
             'music__artist__artist_id',
             'music__artist__artist_name',

@@ -171,10 +171,10 @@ class MusicSearchView(APIView):
             parsed_results = iTunesService.parse_search_results(itunes_data.get('results', []))
             
             # DB에 이미 있는지 확인
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
             itunes_ids = [r['itunes_id'] for r in parsed_results if r.get('itunes_id')]
             existing_music = Music.objects.filter(
-                itunes_id__in=itunes_ids,
-                is_deleted=False
+                itunes_id__in=itunes_ids
             ).values_list('itunes_id', flat=True)
             
             existing_set = set(existing_music)
@@ -184,21 +184,20 @@ class MusicSearchView(APIView):
             artist_name_to_id = {}
             if artist_names:
                 # DB에 있는 아티스트 조회
+                # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
                 existing_artists = Artists.objects.filter(
-                    artist_name__in=artist_names,
-                    is_deleted__in=[False, None]
+                    artist_name__in=artist_names
                 ).values('artist_id', 'artist_name')
                 artist_name_to_id = {a['artist_name']: a['artist_id'] for a in existing_artists}
                 
                 # DB에 없는 아티스트 생성
                 for artist_name in artist_names:
                     if artist_name not in artist_name_to_id:
+                        # TrackableMixin이 자동으로 created_at, is_deleted 설정
                         artist, artist_created = Artists.objects.get_or_create(
                             artist_name=artist_name,
                             defaults={
                                 'artist_image': '',  # 비동기로 수집
-                                'created_at': timezone.now(),
-                                'is_deleted': False,
                             }
                         )
                         artist_name_to_id[artist_name] = artist.artist_id
@@ -235,14 +234,14 @@ class MusicSearchView(APIView):
                     if album_key not in album_key_to_id:
                         # 앨범 조회 또는 생성
                         try:
+                            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
                             artist = Artists.objects.get(artist_id=artist_id)
+                            # TrackableMixin이 자동으로 created_at, is_deleted 설정
                             album, album_created = Albums.objects.get_or_create(
                                 album_name=album_name,
                                 artist=artist,
                                 defaults={
                                     'album_image': '',  # 비동기로 수집
-                                    'created_at': timezone.now(),
-                                    'is_deleted': False,
                                 }
                             )
                             album_key_to_id[album_key] = album.album_id
@@ -274,14 +273,11 @@ class MusicSearchView(APIView):
         # 2. 태그가 있으면 필터링
         if tags:
             # DB에서 태그를 가진 곡의 itunes_id 찾기
-            tag_objects = Tags.objects.filter(
-                tag_key__in=tags,
-                is_deleted=False
-            )
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+            tag_objects = Tags.objects.filter(tag_key__in=tags)
             
             music_ids_with_tags = MusicTags.objects.filter(
-                tag__in=tag_objects,
-                is_deleted=False
+                tag__in=tag_objects
             ).values_list('music__itunes_id', flat=True).distinct()
             
             itunes_ids_with_tags = set(music_ids_with_tags)
@@ -297,9 +293,9 @@ class MusicSearchView(APIView):
             else:
                 # 태그만 검색 (#christmas)
                 # DB에서 해당 태그를 가진 음악 조회
+                # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
                 musics = Music.objects.filter(
-                    itunes_id__in=itunes_ids_with_tags,
-                    is_deleted=False
+                    itunes_id__in=itunes_ids_with_tags
                 ).select_related('artist', 'album')
                 
                 if exclude_ai:

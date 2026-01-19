@@ -66,9 +66,10 @@ class LoginView(APIView):
         email = serializer.validated_data['email']
         password = serializer.validated_data['password']
         
-        # 사용자 조회 (삭제되지 않은 사용자만)
+        # 사용자 조회
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         try:
-            user = Users.objects.get(email=email, is_deleted=False)
+            user = Users.objects.get(email=email)
         except Users.DoesNotExist:
             return Response(
                 {'error': '이메일 또는 비밀번호가 올바르지 않습니다.'},
