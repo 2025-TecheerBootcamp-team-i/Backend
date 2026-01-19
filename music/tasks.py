@@ -1,4 +1,4 @@
-﻿"""
+"""
 Celery 비동기 작업 정의 (AI 음악 생성, 차트 계산, 데이터 정리)
 """
 import time
@@ -969,8 +969,7 @@ def update_realtime_chart():
                 logger.info("[실시간 차트] 집계 데이터 없음")
                 return {"status": "no_data", "count": 0}
             
-            # 2. 기존 동일 시점 차트 삭제 (중복 방지)
-            # chart_date를 분 단위로 정규화 (timezone 제거 - DB가 timestamp 타입)
+            # 2. chart_date를 분 단위로 정규화 (timezone 제거 - DB가 timestamp 타입)
             chart_date = localtime(now).replace(second=0, microsecond=0, tzinfo=None)
             
             # 3. 순위별 차트 저장
@@ -1025,9 +1024,10 @@ def update_daily_chart():
                 logger.info("[일일 차트] 집계 데이터 없음")
                 return {"status": "no_data", "count": 0}
             
-            # 2. 순위별 차트 저장
-            # timezone 제거 (DB가 timestamp 타입)
+            # 2. timezone 제거 (DB가 timestamp 타입)
             chart_date = localtime(yesterday_start).replace(tzinfo=None)
+            
+            # 3. 순위별 차트 저장
             created_count = 0
             
             for rank, item in enumerate(results, start=1):
@@ -1082,9 +1082,10 @@ def update_ai_chart():
                 logger.info("[AI 차트] 집계 데이터 없음")
                 return {"status": "no_data", "count": 0}
             
-            # 2. 순위별 차트 저장
-            # timezone 제거 (DB가 timestamp 타입)
+            # 2. timezone 제거 (DB가 timestamp 타입)
             chart_date = localtime(yesterday_start).replace(tzinfo=None)
+            
+            # 3. 순위별 차트 저장
             created_count = 0
             
             for rank, item in enumerate(results, start=1):
