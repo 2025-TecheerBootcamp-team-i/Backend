@@ -34,6 +34,7 @@ class AlbumDetailSerializer(serializers.ModelSerializer):
     """앨범 상세 조회용 Serializer (수록곡 목록 포함)"""
     artist = ArtistSerializer(read_only=True)
     album_image = serializers.SerializerMethodField()
+    image_large_square = serializers.SerializerMethodField()
     tracks = serializers.SerializerMethodField()
     track_count = serializers.SerializerMethodField()
     total_duration = serializers.SerializerMethodField()
@@ -43,7 +44,7 @@ class AlbumDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Albums
         fields = [
-            'album_id', 'album_name', 'album_image', 'artist',
+            'album_id', 'album_name', 'album_image', 'image_large_square', 'artist',
             'track_count', 'total_duration', 'total_duration_formatted',
             'like_count', 'tracks', 'created_at', 'updated_at'
         ]
@@ -55,6 +56,10 @@ class AlbumDetailSerializer(serializers.ModelSerializer):
             return obj.image_square
         # 없으면 원본 album_image 사용
         return obj.album_image
+    
+    def get_image_large_square(self, obj):
+        """image_large_square 필드 값 반환"""
+        return obj.image_large_square if obj.image_large_square else None
     
     def get_tracks(self, obj):
         """앨범의 수록곡 목록 조회"""

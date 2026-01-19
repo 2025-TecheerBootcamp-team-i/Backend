@@ -33,7 +33,7 @@ from ..utils.s3_upload import is_suno_url, is_s3_url
 @extend_schema(
     summary="AI 음악 생성 (동기) - 웹 페이지용",
     description="Suno API를 사용한 AI 음악 생성 (동기 처리, 완료까지 대기) - 웹 페이지 템플릿에서 사용",
-    tags=['AI 음악 생성 (웹 페이지)']
+    tags=['음악 생성']
 )
 def generate_music(request):
     """
@@ -415,7 +415,7 @@ def generate_music(request):
 @extend_schema(
     summary="AI 음악 생성 (비동기) - 웹 페이지용",
     description="Celery를 사용한 AI 음악 생성 (비동기 처리, task_id 반환) - 웹 페이지 템플릿에서 사용",
-    tags=['AI 음악 생성 (웹 페이지)']
+    tags=['음악 생성']
 )
 def generate_music_async(request):
     """
@@ -470,7 +470,7 @@ def generate_music_async(request):
 @extend_schema(
     summary="Celery 작업 상태 조회 - 웹 페이지용",
     description="Celery 작업의 상태 및 결과 조회 - 웹 페이지 템플릿에서 사용",
-    tags=['작업 상태 (웹 페이지)']
+    tags=['작업 상태 조회']
 )
 def get_task_status(request, task_id):
     """
@@ -510,7 +510,7 @@ def get_task_status(request, task_id):
 @extend_schema(
     summary="음악 목록 조회 (웹 페이지용)",
     description="음악 목록 조회 (is_ai, user_id 필터링 지원) - 웹 페이지 템플릿에서 사용",
-    tags=['음악 (웹 페이지)']
+    tags=['음악 조회']
 )
 def list_music(request):
     """
@@ -546,7 +546,7 @@ def list_music(request):
 @extend_schema(
     summary="음악 상세 조회 (웹 페이지용)",
     description="음악 ID로 상세 정보 조회 - 웹 페이지 템플릿에서 사용",
-    tags=['음악 (웹 페이지)']
+    tags=['음악 조회']
 )
 def get_music_detail(request, music_id):
     """
@@ -570,7 +570,7 @@ def get_music_detail(request, music_id):
 @extend_schema(
     summary="Suno 웹훅 (내부)",
     description="Suno API가 음악 생성 완료 시 호출하는 웹훅 - 내부 시스템에서만 사용",
-    tags=['Suno 웹훅 (내부)']
+    tags=['음악 생성']
 )
 def suno_webhook(request):
     """
@@ -661,7 +661,7 @@ def suno_webhook(request):
 @extend_schema(
     summary="Suno 작업 상태 조회 - 웹 페이지용",
     description="Suno API 작업 상태 조회 (Polling용) - 웹 페이지 템플릿에서 사용",
-    tags=['작업 상태 (웹 페이지)']
+    tags=['음악 생성']
 )
 def get_suno_task_status(request, task_id):
     """
