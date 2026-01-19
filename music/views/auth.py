@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from django.contrib.auth.hashers import check_password
 from drf_spectacular.utils import extend_schema
 from ..models import Users
@@ -23,6 +24,7 @@ class RegisterView(APIView):
     @extend_schema(
         summary="회원가입",
         description="이메일, 비밀번호, 닉네임으로 회원가입",
+        request=UserRegisterSerializer,
         tags=['인증']
     )
     
@@ -51,6 +53,7 @@ class LoginView(APIView):
     @extend_schema(
         summary="로그인",
         description="이메일/비밀번호 검증 후 JWT 토큰(Access, Refresh) 발급",
+        request=UserLoginSerializer,
         tags=['인증']
     )
     
@@ -104,6 +107,7 @@ class TokenRefreshView(BaseTokenRefreshView):
     @extend_schema(
         summary="JWT 토큰 갱신",
         description="Refresh Token을 사용하여 새로운 Access Token 발급",
+        request=TokenRefreshSerializer,
         tags=['인증']
     )
     def post(self, request, *args, **kwargs):
