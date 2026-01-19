@@ -316,6 +316,7 @@ def spectacular_postprocessing_hook(result, generator, request, public):
     drf-spectacular postprocessing hook
     - api/music 경로의 operation 태그를 'Music API'로 변경
     - /music/ 경로의 operation 태그를 '웹'으로 변경
+    - /api/v1/tracks/ 경로의 'tracks' 태그를 제거하고 재생 관련은 '음악 재생'으로 변경
     """
     # paths에서 경로별로 태그 변경
     if 'paths' in result:
@@ -332,6 +333,102 @@ def spectacular_postprocessing_hook(result, generator, request, public):
                     if isinstance(method, dict) and 'tags' in method:
                         if method['tags']:
                             method['tags'] = ['웹']
+            # /api/v1/tracks/ 경로 처리: 'tracks' 태그 제거 및 재생 관련은 '음악 재생'으로
+            elif path.startswith('/api/v1/tracks/'):
+                for method_name, method in methods.items():
+                    if isinstance(method, dict) and 'tags' in method:
+                        tags = method['tags']
+                        # 'tracks' 태그가 있으면 제거
+                        if 'tracks' in tags:
+                            tags.remove('tracks')
+                        # 재생 관련 경로(/play)는 '음악 재생' 태그로 변경
+                        if '/play' in path:
+                            if '음악 재생' not in tags:
+                                tags.append('음악 재생')
+                        # 태그가 비어있으면 기본 태그 유지 (각 View에서 설정한 태그)
+                        if not tags and method.get('tags'):
+                            # 원래 태그가 있으면 유지
+                            pass
+            # /api/v1/generate/, /api/v1/generate-async/, /api/v1/suno-task/ 경로 처리: 모두 '음악 생성' 태그로 통일
+            elif path.startswith('/api/v1/generate/') or path.startswith('/api/v1/generate-async/') or path.startswith('/api/v1/suno-task/'):
+                for method_name, method in methods.items():
+                    if isinstance(method, dict) and 'tags' in method:
+                        # 다른 태그는 모두 제거하고 '음악 생성' 태그만 유지
+                        method['tags'] = ['음악 생성']
+            # /api/v1/task/ 경로 처리: 'task' 태그 제거하고 '작업 상태 조회'로 변경
+            elif path.startswith('/api/v1/task/'):
+                for method_name, method in methods.items():
+                    if isinstance(method, dict) and 'tags' in method:
+                        tags = method['tags']
+                        # 'task' 태그가 있으면 제거
+                        if 'task' in tags:
+                            tags.remove('task')
+                        # '작업 상태 조회' 태그 추가
+                        if '작업 상태 조회' not in tags:
+                            tags.append('작업 상태 조회')
+                        # 태그가 비어있으면 '작업 상태 조회'로 설정
+                        if not tags:
+                            method['tags'] = ['작업 상태 조회']
+            # /api/v1/webhook/ 경로 처리: 'Webhook' 태그 제거하고 '음악 생성'으로 변경
+            elif path.startswith('/api/v1/webhook/'):
+                for method_name, method in methods.items():
+                    if isinstance(method, dict) and 'tags' in method:
+                        tags = method['tags']
+                        # 'Webhook', 'webhook' 태그가 있으면 제거
+                        if 'Webhook' in tags:
+                            tags.remove('Webhook')
+                        if 'webhook' in tags:
+                            tags.remove('webhook')
+                        # '음악 생성' 태그 추가
+                        if '음악 생성' not in tags:
+                            tags.append('음악 생성')
+                        # 태그가 비어있으면 '음악 생성'으로 설정
+                        if not tags:
+                            method['tags'] = ['음악 생성']
+    
+    # 모든 경로에서 'default' 태그가 있는 경우 '음악 조회'로 변경 (별도 루프로 처리)
+    # 이 루프는 모든 경로를 다시 순회하여 'default' 태그를 확실히 제거
+    if 'paths' in result:
+        for path, methods in result['paths'].items():
+            for method_name, method in methods.items():
+                if isinstance(method, dict):
+                    # 'tags' 키가 없으면 생성
+                    if 'tags' not in method:
+                        method['tags'] = []
+                    
+                    tags = method.get('tags', [])
+                    # None이거나 빈 값인 경우 빈 리스트로 설정
+                    if tags is None:
+                        tags = []
+                    # 리스트가 아닌 경우 리스트로 변환
+                    if not isinstance(tags, list):
+                        tags = [tags] if tags else []
+                    
+                    # 'default' 태그 제거 (대소문자 구분 없이, 모든 변형 체크)
+                    filtered_tags = []
+                    has_default = False
+                    for tag in tags:
+                        # 문자열로 변환하여 비교
+                        tag_str = str(tag).strip().lower()
+                        # 'default'의 모든 변형 체크
+                        if tag_str in ['default', 'defaults', 'default tag']:
+                            has_default = True
+                        else:
+                            filtered_tags.append(tag)
+                    
+                    # 'default' 태그가 있었거나 태그가 비어있는 경우
+                    if has_default:
+                        # '음악 조회' 태그 추가 (없는 경우에만)
+                        if '음악 조회' not in filtered_tags:
+                            filtered_tags.insert(0, '음악 조회')  # 맨 앞에 추가
+                        # 태그 리스트 완전히 교체
+                        method['tags'] = filtered_tags
+                    elif not filtered_tags:
+                        # 태그가 비어있으면 '음악 조회'로 설정
+                        method['tags'] = ['음악 조회']
+                    else:
+                        # 'default'가 없어도 태그 리스트 업데이트
+                        method['tags'] = filtered_tags
     return result
 
 
@@ -351,10 +448,13 @@ SPECTACULAR_SETTINGS = {
         {'name': '검색'},
         {'name': '음악 상세'},
         {'name': '음악 재생'},
+        {'name': '음악 조회'},
         {'name': '좋아요'},
         {'name': '아티스트'},
         {'name': '사용자 통계'},
         {'name': '플레이리스트'},
+        {'name': '음악 생성'},
+        {'name': '작업 상태 조회'},
         {'name': '테스트'},
     ],
     # api/music 경로의 태그를 'Music API'로 통일

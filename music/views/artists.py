@@ -225,7 +225,9 @@ class PopularArtistsView(APIView):
         ).values(
             'music__artist__artist_id',
             'music__artist__artist_name',
-            'music__artist__artist_image'
+            'music__artist__artist_image',
+            'music__artist__image_small_circle',
+            'music__artist__image_large_circle'
         ).annotate(
             play_count=Count('play_log_id')
         ).order_by('-play_count')[:limit]
@@ -233,11 +235,20 @@ class PopularArtistsView(APIView):
         # 결과를 Serializer 형식으로 변환
         artists_data = []
         for idx, artist_stat in enumerate(popular_artists, 1):
+            # RDS에서 이미지 우선순위: image_small_circle -> image_large_circle -> artist_image
+            circle_image = artist_stat.get('music__artist__image_small_circle')
+            if not circle_image or (isinstance(circle_image, str) and not circle_image.strip()):
+                # image_small_circle이 없으면 image_large_circle 사용
+                circle_image = artist_stat.get('music__artist__image_large_circle')
+                if not circle_image or (isinstance(circle_image, str) and not circle_image.strip()):
+                    # 둘 다 없으면 원본 artist_image 사용
+                    circle_image = artist_stat.get('music__artist__artist_image')
+            
             artists_data.append({
                 'rank': idx,
                 'artist_id': artist_stat['music__artist__artist_id'],
                 'artist_name': artist_stat['music__artist__artist_name'],
-                'image_small_circle': artist_stat['music__artist__artist_image'],
+                'image_small_circle': circle_image,
                 'play_count': artist_stat['play_count']
             })
         

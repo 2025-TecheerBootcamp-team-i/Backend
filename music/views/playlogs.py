@@ -55,7 +55,7 @@ class PlayLogCreateView(APIView):
             401: OpenApiResponse(description="인증 실패"),
             404: OpenApiResponse(description="음악을 찾을 수 없음"),
         },
-        tags=["재생 기록"]
+        tags=['음악 재생']
     )
     def post(self, request, music_id):
         """재생 기록 생성 (PlayLog 도메인)"""
