@@ -67,6 +67,14 @@ docker compose -f docker-compose.prod.yml ps
 
 # 현재 이미지 버전 확인
 docker compose -f docker-compose.prod.yml images
+
+# 정확한 버전 번호 확인 (latest가 실제로 몇 버전인지)
+docker inspect hhyuninu/2025_techeer_team_i:latest | grep -A 1 "org.opencontainers.image.version"
+```
+
+**출력 예시**:
+```json
+"org.opencontainers.image.version": "1.0.54",
 ```
 
 ### 3단계: docker-compose.prod.yml에서 버전 고정
@@ -267,13 +275,25 @@ PR #55 머지 → 1.0.55 + latest (1.0.55)  ← latest가 1.0.55로 업데이트
 
 ### Q1. 특정 버전 번호를 모를 때
 
-**Docker Hub에서 확인**:
+**방법 1: 이미지 라벨로 확인 (가장 쉬움)**:
+```bash
+# EC2에서
+docker inspect hhyuninu/2025_techeer_team_i:latest | grep -A 4 "Labels"
+
+# 또는 버전만 확인
+docker inspect hhyuninu/2025_techeer_team_i:latest \
+  | grep "org.opencontainers.image.version" \
+  | cut -d'"' -f4
+# 출력: 1.0.54
+```
+
+**방법 2: Docker Hub에서 확인**:
 ```bash
 # 브라우저에서
 https://hub.docker.com/r/hhyuninu/2025_techeer_team_i/tags
 ```
 
-**또는 GitHub PR 번호로 확인**:
+**방법 3: GitHub PR 번호로 확인**:
 - GitHub PR 목록에서 마지막으로 머지된 PR 번호 확인
 - 그 번호가 버전 번호
 

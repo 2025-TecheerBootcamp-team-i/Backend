@@ -57,6 +57,11 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:${{ steps.set_tag.outputs.DOCKER_IMAGE_TAG }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:latest
+          labels: |
+            org.opencontainers.image.version=${{ steps.set_tag.outputs.DOCKER_IMAGE_TAG }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
