@@ -461,6 +461,17 @@ SPECTACULAR_SETTINGS = {
     'POSTPROCESSING_HOOKS': [
         'config.settings.spectacular_postprocessing_hook',
     ],
+
+    'APPEND_COMPONENTS': {
+        "securitySchemes": {
+            "jwtAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+            }
+        }
+    },
+    'SECURITY': [{"jwtAuth": []}],
 }
 
 # ==============================================
