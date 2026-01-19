@@ -36,10 +36,11 @@ class ChartMusicSerializer(serializers.ModelSerializer):
 class ChartItemSerializer(serializers.ModelSerializer):
     """차트 개별 항목 Serializer (순위 포함)"""
     music = ChartMusicSerializer(read_only=True)
+    rank_change = serializers.IntegerField(required=False, allow_null=True, help_text="순위 변동폭 (이전 순위 - 현재 순위, null=NEW)")
     
     class Meta:
         model = Charts
-        fields = ['rank', 'play_count', 'music']
+        fields = ['rank', 'play_count', 'rank_change', 'music']
 
 
 class ChartResponseSerializer(serializers.Serializer):

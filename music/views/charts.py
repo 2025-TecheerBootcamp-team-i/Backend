@@ -98,7 +98,7 @@ class ChartView(APIView):
         tags=["차트"]
     )
     def get(self, request, type):
-        """차트 조회"""
+        """차트 조회 (순위 변동 동적 계산)"""
         # 1. 타입 검증
         if type not in self.VALID_TYPES:
             return Response(
@@ -118,14 +118,8 @@ class ChartView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # 3. 해당 날짜의 전체 차트 조회
+        # 3. 현재 차트 조회
         # DB가 timestamp(timezone 없음)이므로 날짜+시간 문자열로 비교
-        from django.db.models import Q
-        from django.db import connection
-        
-        # 방법: 동일 chart_date를 가진 모든 항목 조회 (rank 기준)
-        # latest_chart와 같은 batch의 차트들은 chart_date와 type이 같음
-        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         chart_items = Charts.objects.filter(type=type).extra(
             where=["chart_date::text = %s::text"],
             params=[str(latest_chart.chart_date)]
@@ -135,7 +129,33 @@ class ChartView(APIView):
             'music__album'
         ).order_by('rank')
         
-        # 4. 응답 구성
+        # 4. 이전 차트 조회 (순위 변동 계산용)
+        previous_chart = Charts.objects.filter(
+            type=type,
+            chart_date__lt=latest_chart.chart_date,
+            is_deleted=False
+        ).order_by('-chart_date').first()
+        
+        previous_ranks = {}
+        if previous_chart:
+            # 이전 차트의 순위 정보를 {music_id: rank} 딕셔너리로 구성
+            previous_items = Charts.objects.filter(type=type).extra(
+                where=["chart_date::text = %s::text"],
+                params=[str(previous_chart.chart_date)]
+            ).values('music_id', 'rank')
+            
+            previous_ranks = {item['music_id']: item['rank'] for item in previous_items}
+        
+        # 5. 각 차트 항목에 rank_change 추가
+        for chart in chart_items:
+            if chart.music_id in previous_ranks:
+                # 이전 순위 - 현재 순위 (양수=상승, 음수=하락, 0=유지)
+                chart.rank_change = previous_ranks[chart.music_id] - chart.rank
+            else:
+                # 이전 차트에 없었음 (신규 진입)
+                chart.rank_change = None
+        
+        # 6. 응답 구성
         response_data = {
             "type": type,
             "generated_at": latest_chart.chart_date,
