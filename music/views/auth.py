@@ -23,8 +23,50 @@ class RegisterView(APIView):
     
     @extend_schema(
         summary="회원가입",
-        description="이메일, 비밀번호, 닉네임으로 회원가입",
+        description="""이메일, 비밀번호, 닉네임으로 회원가입
+
+**유효성 검증 규칙:**
+- **이메일**: 형식 검증(사용자명@도메인.최상위도메인) + 중복 확인 불가
+- **비밀번호**: 8-16자 + 영문자/숫자/특수기호 각 1개 이상 필수
+- **비밀번호 확인**: 원본 비밀번호와 정확히 일치해야 함
+- **닉네임**: 필수 입력 (2-20자)
+
+**특수기호 허용 목록**: !@#$%^&*()_+-=[]{}|;:',\".<>/?~
+""",
         request=UserRegisterSerializer,
+        responses={
+            201: {
+                'description': '회원가입 성공',
+                'content': {
+                    'application/json': {
+                        'example': {
+                            'message': '회원가입 성공',
+                            'user_id': 1,
+                            'email': 'user@example.com',
+                            'nickname': '사용자닉네임'
+                        }
+                    }
+                }
+            },
+            400: {
+                'description': '유효성 검증 실패',
+                'content': {
+                    'application/json': {
+                        'examples': {
+                            'email_validation': {
+                                'value': {'email': ['이메일 형식이 올바르지 않습니다']}
+                            },
+                            'password_complexity': {
+                                'value': {'password': ['문자/숫자/특수기호가 부족해요: 숫자, 특수기호']}
+                            },
+                            'password_mismatch': {
+                                'value': {'password_confirm': ['비밀번호가 일치하지 않습니다']}
+                            }
+                        }
+                    }
+                }
+            }
+        },
         tags=['인증']
     )
     
