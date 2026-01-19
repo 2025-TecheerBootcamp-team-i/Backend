@@ -7,9 +7,9 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from django.db import transaction
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
-from ..models import Music, Artists, Albums, PlayLogs
+from ..models import Music, Artists, Albums
 from ..serializers import MusicDetailSerializer, MusicPlaySerializer
 from ..services import iTunesService
 from ..tasks import fetch_artist_image_task, fetch_album_image_task, fetch_lyrics_task, save_itunes_track_to_db_task
@@ -213,12 +213,9 @@ class MusicDetailView(APIView):
 
 class MusicPlayView(APIView):
     """
-    음악 재생 API
-    
-    - 음악 재생에 필요한 정보 반환 (audio_url 포함)
-    - 재생 로그 기록 (인증된 사용자인 경우)
-    
-    GET /api/v1/tracks/{music_id}/play
+    음악 재생 정보 조회 (Music 도메인)
+    - GET: 음악 재생에 필요한 정보 반환 (audio_url, 가사 등)
+    - 로그는 저장하지 않음 (PlayLog 도메인과 분리)
     """
     permission_classes = [AllowAny]
     
@@ -234,9 +231,9 @@ class MusicPlayView(APIView):
         - album_image (앨범 커버 이미지)
         - lyrics (가사, 있는 경우)
         
-        **재생 로그:**
-        - 인증된 사용자의 경우 play_logs 테이블에 재생 기록 저장
-        - 비인증 사용자는 로그 저장하지 않음
+        **주의:**
+        - GET 요청은 로그를 저장하지 않습니다
+        - 실제 재생 시에는 POST 요청으로 로그를 기록해야 합니다
         """,
         parameters=[
             OpenApiParameter(
@@ -256,12 +253,12 @@ class MusicPlayView(APIView):
         ],
         responses={
             200: MusicPlaySerializer,
-            404: {'description': 'Not Found - 음악을 찾을 수 없음'},
+            404: OpenApiResponse(description='Not Found - 음악을 찾을 수 없음'),
         },
         tags=['음악 재생']
     )
     def get(self, request, music_id):
-        """음악 재생 정보 조회"""
+        """음악 재생 정보 조회 (로그 저장 안 함)"""
         
         # 1. 음악 정보 조회
         try:
@@ -282,28 +279,6 @@ class MusicPlayView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # 3. 재생 로그 기록 (인증된 사용자만)
-        if request.user.is_authenticated:
-            try:
-                # Users 모델에서 사용자 조회
-                from ..models import Users
-                user = Users.objects.get(email=request.user.email)
-                
-                # 재생 로그 저장
-                PlayLogs.objects.create(
-                    music=music,
-                    user=user,
-                    played_at=timezone.now(),
-                    created_at=timezone.now(),
-                    is_deleted=False
-                )
-            except Users.DoesNotExist:
-                # Users 테이블에 없는 경우 (Django auth_user만 있는 경우) 로그 저장 안 함
-                pass
-            except Exception as e:
-                # 로그 저장 실패해도 음악 재생은 가능하도록 처리
-                print(f"재생 로그 저장 실패: {str(e)}")
-        
-        # 4. 음악 재생 정보 반환
+        # 3. 음악 재생 정보 반환 (로그 저장 안 함)
         serializer = MusicPlaySerializer(music)
         return Response(serializer.data)

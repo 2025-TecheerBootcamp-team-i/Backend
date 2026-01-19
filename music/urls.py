@@ -11,7 +11,6 @@ from .views import (
     MusicLikeView,
     MusicSearchView,
     MusicDetailView,
-    MusicPlayView,
     ArtistDetailView,
     ArtistTracksView,
     ArtistAlbumsView,
@@ -61,9 +60,10 @@ urlpatterns = [
     # GET /api/v1/tracks/{itunes_id}
     path('tracks/<int:itunes_id>', MusicDetailView.as_view(), name='track-detail'),
     
-    # 음악 재생 (audio_url 반환 및 재생 로그 기록)
-    # GET /api/v1/tracks/{music_id}/play
-    path('tracks/<int:music_id>/play', MusicPlayView.as_view(), name='music-play'),
+    # 음악 재생 정보 조회 및 재생 로그 기록
+    # GET /api/v1/tracks/{music_id}/play - 재생 정보 조회 (로그 저장 안 함)
+    # POST /api/v1/tracks/{music_id}/play - 재생 로그 기록
+    path('tracks/<int:music_id>/play', PlayLogView.as_view(), name='music-play'),
 
     # 인기 아티스트 목록 조회
     # GET /api/v1/artists/popular?limit=7
@@ -89,10 +89,6 @@ urlpatterns = [
     # POST /api/v1/tracks/{music_id}/likes
     # DELETE /api/v1/tracks/{music_id}/likes
     path('tracks/<int:music_id>/likes', MusicLikeView.as_view(), name='music-like'),
-    
-    # 재생 기록
-    # POST /api/v1/tracks/{music_id}/play
-    path('tracks/<int:music_id>/play', PlayLogView.as_view(), name='play-log'),
     
     # 차트 조회
     # GET /api/v1/charts/{type} (realtime|daily|ai)
