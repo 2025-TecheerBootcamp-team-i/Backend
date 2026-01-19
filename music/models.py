@@ -30,6 +30,7 @@ class Albums(models.Model):
     album_name = models.CharField(max_length=200, blank=True, null=True)
     album_image = models.CharField(max_length=255, blank=True, null=True)
     image_square = models.TextField(blank=True, null=True)  # 220x220 사각형 이미지
+    image_large_square = models.TextField(blank=True, null=True)  # 360x360 사각형 이미지
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     is_deleted = models.BooleanField(blank=True, null=True)

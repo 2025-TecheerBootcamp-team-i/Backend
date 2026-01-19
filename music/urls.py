@@ -10,7 +10,7 @@ from .views import (
     TokenRefreshView,
     MusicLikeView,
     MusicSearchView,
-    MusicDetailView,
+    MusicDetailView as iTunesMusicDetailView,  # iTunes 기반 상세 조회 (기존)
     ArtistDetailView,
     ArtistTracksView,
     ArtistAlbumsView,
@@ -33,6 +33,17 @@ from .views import (
     PlaylistItemAddView,
     PlaylistItemDeleteView,
     PlaylistLikeView,
+)
+
+# AI 음악 생성 (리팩토링된 CBV)
+from .views.ai_music import (
+    AiMusicGenerateView,
+    AiMusicGenerateAsyncView,
+    CeleryTaskStatusView,
+    MusicListView as AiMusicListView,
+    MusicDetailView as AiMusicDetailView,
+    SunoTaskStatusView,
+    SunoWebhookView,
 )
 
 app_name = 'music'
@@ -58,7 +69,7 @@ urlpatterns = [
     
     # iTunes ID 기반 상세 조회 (DB에 없으면 자동 저장)
     # GET /api/v1/tracks/{itunes_id}
-    path('tracks/<int:itunes_id>', MusicDetailView.as_view(), name='track-detail'),
+    path('tracks/<int:itunes_id>', iTunesMusicDetailView.as_view(), name='track-detail'),
     
     # 음악 재생 정보 조회 및 재생 로그 기록
     # GET /api/v1/tracks/{music_id}/play - 재생 정보 조회 (로그 저장 안 함)
@@ -121,32 +132,41 @@ urlpatterns = [
     # DELETE /api/v1/playlists/{playlistId}/likes - 좋아요 취소
     path('playlists/<int:playlist_id>/likes', PlaylistLikeView.as_view(), name='playlist-like'),
     
-    # 웹 페이지 (UI)
+    # ========================
+    # AI 음악 생성 API (리팩토링된 CBV)
+    # ========================
+    # 음악 생성 (동기) - 완료까지 대기
+    # POST /api/v1/music/generate/
+    path('generate/', AiMusicGenerateView.as_view(), name='ai_music_generate'),
+    
+    # 음악 생성 (비동기) - Celery Task ID 반환
+    # POST /api/v1/music/generate-async/
+    path('generate-async/', AiMusicGenerateAsyncView.as_view(), name='ai_music_generate_async'),
+    
+    # Celery 작업 상태 조회
+    # GET /api/v1/music/task/{task_id}/
+    path('task/<str:task_id>/', CeleryTaskStatusView.as_view(), name='celery_task_status'),
+    
+    # Suno API 작업 상태 조회 (Polling용)
+    # GET /api/v1/music/suno-task/{task_id}/
+    path('suno-task/<str:task_id>/', SunoTaskStatusView.as_view(), name='suno_task_status'),
+    
+    # Suno API 웹훅 (음악 생성 완료 콜백)
+    # POST /api/v1/music/webhook/suno/
+    path('webhook/suno/', SunoWebhookView.as_view(), name='suno_webhook'),
+    
+    # AI 음악 목록 조회 (is_ai, user_id 필터링 지원)
+    # GET /api/v1/music/?is_ai=true&user_id=1
+    path('', AiMusicListView.as_view(), name='ai_music_list'),
+    
+    # AI 음악 상세 조회 (music_id 기반)
+    # GET /api/v1/music/{music_id}/
+    path('<int:music_id>/', AiMusicDetailView.as_view(), name='ai_music_detail'),
+    
+    # 웹 페이지 (UI) - 기존 템플릿 유지
     path('generator/', views.music_generator_page, name='music_generator_page'),
     path('list/', views.music_list_page, name='music_list_page'),
     path('monitor/<int:music_id>/', views.music_monitor_page, name='music_monitor_page'),
-    
-
-    # 음악 생성 (동기)
-    path('generate/', views.generate_music, name='generate_music'),
-    
-    # 음악 생성 (비동기 - Celery)
-    path('generate-async/', views.generate_music_async, name='generate_music_async'),
-    
-    # Suno API 웹훅 (음악 생성 완료 콜백)
-    path('webhook/suno/', views.suno_webhook, name='suno_webhook'),
-    
-    # 작업 상태 조회 (Celery)
-    path('task/<str:task_id>/', views.get_task_status, name='get_task_status'),
-    
-    # Suno API 작업 상태 조회 (Polling용)
-    path('suno-task/<str:task_id>/', views.get_suno_task_status, name='get_suno_task_status'),
-    
-    # 음악 목록 조회
-    path('', views.list_music, name='list_music'),
-    
-    # 음악 상세 조회
-    path('<int:music_id>/', views.get_music_detail, name='get_music_detail'),
     
     # ========================
     # 사용자 통계 API

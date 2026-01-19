@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
+from drf_spectacular.utils import extend_schema
 from ..models import Playlists, PlaylistItems, PlaylistLikes, Music, Users
 from ..serializers.playlist import (
     PlaylistSerializer,
@@ -22,6 +23,7 @@ from ..serializers.playlist import (
 # 헬퍼 함수는 제거하고 request.user를 직접 사용합니다 (likes.py와 동일한 방식)
 
 
+@extend_schema(tags=['플레이리스트'])
 class PlaylistListCreateView(APIView):
     """
     플레이리스트 목록 조회 & 생성 API
@@ -87,6 +89,7 @@ class PlaylistListCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(tags=['플레이리스트'])
 class PlaylistDetailView(APIView):
     """
     플레이리스트 상세 조회, 수정, 삭제 API
@@ -169,6 +172,7 @@ class PlaylistDetailView(APIView):
         )
 
 
+@extend_schema(tags=['플레이리스트'])
 class PlaylistItemAddView(APIView):
     """
     플레이리스트 곡 추가 API
@@ -247,6 +251,7 @@ class PlaylistItemAddView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(tags=['플레이리스트'])
 class PlaylistItemDeleteView(APIView):
     """
     플레이리스트 곡 삭제 API
@@ -279,6 +284,7 @@ class PlaylistItemDeleteView(APIView):
         )
 
 
+@extend_schema(tags=['플레이리스트'])
 class PlaylistLikeView(APIView):
     """
     플레이리스트 좋아요 등록/취소 API
