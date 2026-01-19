@@ -3,8 +3,15 @@ Music 앱의 Views 패키지
 모든 View를 한 곳에서 import 할 수 있도록 export
 """
 
-# 공통 유틸리티
-from .common import MusicPagination, ErrorTestView, DatabaseQueryTestView
+# 공통 유틸리티 및 템플릿 뷰
+from .common import (
+    MusicPagination, 
+    ErrorTestView, 
+    DatabaseQueryTestView,
+    music_generator_page,
+    music_list_page,
+    music_monitor_page,
+)
 
 # 인증 관련 Views
 from .auth import (
@@ -50,18 +57,15 @@ from .playlist import (
     PlaylistLikeView,
 )
 
-# 레거시 함수 기반 Views (웹 페이지 및 음악 생성)
-from .legacy import (
-    music_generator_page,
-    music_list_page,
-    music_monitor_page,
-    generate_music,
-    generate_music_async,
-    suno_webhook,
-    get_task_status,
-    get_suno_task_status,
-    list_music,
-    get_music_detail,
+# AI 음악 생성 Views (리팩토링된 CBV)
+from .ai_music import (
+    AiMusicGenerateView,
+    AiMusicGenerateAsyncView,
+    CeleryTaskStatusView,
+    MusicListView as AiMusicListView,
+    MusicDetailView as AiMusicDetailView,
+    SunoTaskStatusView,
+    SunoWebhookView,
 )
 
 # 외부에서 사용 가능한 모든 클래스 및 함수
@@ -105,15 +109,16 @@ __all__ = [
     'PlaylistItemAddView',
     'PlaylistItemDeleteView',
     'PlaylistLikeView',
-    # legacy (함수 기반)
+    # legacy (함수 기반 - 템플릿 렌더링용)
     'music_generator_page',
     'music_list_page',
     'music_monitor_page',
-    'generate_music',
-    'generate_music_async',
-    'suno_webhook',
-    'get_task_status',
-    'get_suno_task_status',
-    'list_music',
-    'get_music_detail',
+    # ai_music (리팩토링된 CBV)
+    'AiMusicGenerateView',
+    'AiMusicGenerateAsyncView',
+    'CeleryTaskStatusView',
+    'AiMusicListView',
+    'AiMusicDetailView',
+    'SunoTaskStatusView',
+    'SunoWebhookView',
 ]

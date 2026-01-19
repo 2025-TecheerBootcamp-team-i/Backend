@@ -390,3 +390,4 @@ else:
     # 개발 환경 또는 S3 미설정: 로컬 스토리지 사용
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+
