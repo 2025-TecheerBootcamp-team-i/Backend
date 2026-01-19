@@ -163,17 +163,20 @@ def is_suno_url(url: str) -> bool:
 def is_s3_url(url: str) -> bool:
     """
     URL이 S3 URL인지 확인합니다.
-    
-    Args:
-        url: 확인할 URL
-        
-    Returns:
-        S3 URL이면 True, 아니면 False
     """
     if not url:
         return False
     
-    return 's3.amazonaws.com' in url or '.s3.' in url or settings.AWS_STORAGE_BUCKET_NAME in url
+    # S3 도메인 패턴 체크
+    if 's3.amazonaws.com' in url or '.s3.' in url:
+        return True
+        
+    # 버킷 이름이 설정된 경우에만 체크
+    bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+    if bucket_name and bucket_name in url:
+        return True
+        
+    return False
 
 
 def upload_image_to_s3(

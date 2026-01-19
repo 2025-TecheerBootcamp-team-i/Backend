@@ -1,6 +1,7 @@
 """
 공통 유틸리티 - 페이지네이션 등
 """
+from django.shortcuts import render
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -9,6 +10,33 @@ import random
 from django.db import connection
 from drf_spectacular.utils import extend_schema
 from ..models import Music, Artists, Albums, Tags, MusicTags, PlayLogs
+
+
+def music_generator_page(request):
+    """
+    음악 생성기 웹 페이지
+    
+    GET /music/generator/
+    """
+    return render(request, 'music/music_generator.html')
+
+
+def music_monitor_page(request, music_id):
+    """
+    음악 생성 모니터링 웹 페이지
+    
+    GET /music/monitor/{music_id}/
+    """
+    return render(request, 'music/monitor.html', {'music_id': music_id})
+
+
+def music_list_page(request):
+    """
+    AI 음악 목록 웹 페이지
+    
+    GET /music/list/
+    """
+    return render(request, 'music/music_list.html')
 
 
 class MusicPagination(PageNumberPagination):
