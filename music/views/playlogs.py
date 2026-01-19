@@ -66,18 +66,13 @@ class PlayLogCreateView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
-        # 1. 음악 존재 확인
-        music = get_object_or_404(
-            Music.objects.filter(is_deleted=False),
-            music_id=music_id
-        )
+        # 1. 음악 존재 확인 (SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회)
+        music = get_object_or_404(Music, music_id=music_id)
         
         # 2. 사용자 조회 (JWT에서 email 추출)
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         try:
-            user = Users.objects.get(
-                email=request.user.email,
-                is_deleted=False
-            )
+            user = Users.objects.get(email=request.user.email)
         except Users.DoesNotExist:
             return Response(
                 {"detail": "사용자를 찾을 수 없습니다"},
@@ -85,14 +80,11 @@ class PlayLogCreateView(APIView):
             )
         
         # 3. 재생 기록 생성
-        now = timezone.now()
+        # TrackableMixin이 created_at, updated_at, is_deleted를 자동으로 관리
         play_log = PlayLogs.objects.create(
             music=music,
             user=user,
-            played_at=now,
-            created_at=now,
-            updated_at=now,
-            is_deleted=False
+            played_at=timezone.now()
         )
         
         # 4. 응답 반환

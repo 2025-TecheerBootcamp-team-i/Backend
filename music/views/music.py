@@ -42,12 +42,11 @@ class MusicDetailView(APIView):
         
         if artist_name:
             # Artist 생성/조회 (이미지는 비동기로 수집하므로 빈 값으로 저장)
+            # TrackableMixin이 자동으로 created_at, is_deleted 설정
             artist, artist_created = Artists.objects.get_or_create(
                 artist_name=artist_name,
                 defaults={
                     'artist_image': '',  # Wikidata에서 비동기로 수집
-                    'created_at': timezone.now(),
-                    'is_deleted': False,
                 }
             )
         
@@ -56,13 +55,12 @@ class MusicDetailView(APIView):
         album = None
         album_created = False
         if album_name and artist:
+            # TrackableMixin이 자동으로 created_at, is_deleted 설정
             album, album_created = Albums.objects.get_or_create(
                 album_name=album_name,
                 artist=artist,
                 defaults={
                     'album_image': '',  # 비동기로 수집
-                    'created_at': timezone.now(),
-                    'is_deleted': False,
                 }
             )
             
@@ -77,6 +75,7 @@ class MusicDetailView(APIView):
                     logging.getLogger(__name__).warning(f"앨범 이미지 태스크 호출 실패: {e}")
         
         # Music 생성 (가사는 비동기로 수집하므로 빈 값으로 저장)
+        # TrackableMixin이 자동으로 created_at, is_deleted 설정
         music = Music.objects.create(
             itunes_id=itunes_data.get('itunes_id'),
             music_name=itunes_data.get('music_name', ''),
@@ -87,8 +86,6 @@ class MusicDetailView(APIView):
             audio_url=itunes_data.get('audio_url', ''),
             lyrics=None,  # LRCLIB에서 비동기로 수집
             is_ai=False,
-            created_at=timezone.now(),
-            is_deleted=False,
         )
         
         # 비동기 태스크 호출: 아티스트 이미지 수집 (새로 생성되었거나 이미지가 없는 경우)
@@ -157,11 +154,9 @@ class MusicDetailView(APIView):
         """iTunes ID로 음악 상세 조회 (방안 2: DB 저장 비동기 처리)"""
         
         # 1. DB에서 조회 (이미 저장된 곡인지 확인)
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         try:
-            music = Music.objects.select_related('artist', 'album').get(
-                itunes_id=itunes_id,
-                is_deleted=False
-            )
+            music = Music.objects.select_related('artist', 'album').get(itunes_id=itunes_id)
             # DB에 이미 있으면 바로 반환 (빠른 응답)
             serializer = MusicDetailSerializer(music)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -261,11 +256,9 @@ class MusicPlayView(APIView):
         """음악 재생 정보 조회 (로그 저장 안 함)"""
         
         # 1. 음악 정보 조회
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         try:
-            music = Music.objects.select_related('artist', 'album').get(
-                music_id=music_id,
-                is_deleted=False
-            )
+            music = Music.objects.select_related('artist', 'album').get(music_id=music_id)
         except Music.DoesNotExist:
             return Response(
                 {'error': '음악을 찾을 수 없습니다.'},

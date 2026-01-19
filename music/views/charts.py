@@ -109,10 +109,8 @@ class ChartView(APIView):
             )
         
         # 2. 최신 차트 날짜 조회
-        latest_chart = Charts.objects.filter(
-            type=type,
-            is_deleted=False
-        ).order_by('-chart_date').first()
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        latest_chart = Charts.objects.filter(type=type).order_by('-chart_date').first()
         
         if not latest_chart:
             return Response(
@@ -127,10 +125,8 @@ class ChartView(APIView):
         
         # 방법: 동일 chart_date를 가진 모든 항목 조회 (rank 기준)
         # latest_chart와 같은 batch의 차트들은 chart_date와 type이 같음
-        chart_items = Charts.objects.filter(
-            type=type,
-            is_deleted=False
-        ).extra(
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        chart_items = Charts.objects.filter(type=type).extra(
             where=["chart_date::text = %s::text"],
             params=[str(latest_chart.chart_date)]
         ).select_related(

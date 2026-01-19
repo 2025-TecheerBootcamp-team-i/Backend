@@ -6,16 +6,19 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
+from .mixins import TrackableMixin
+from .managers import SoftDeleteManager
 
 
-class AiInfo(models.Model):
+class AiInfo(TrackableMixin, models.Model):
     aiinfo_id = models.AutoField(primary_key=True)
     music = models.ForeignKey('Music', models.DO_NOTHING, blank=True, null=True)
     task_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)  # Suno API taskId 저장
     input_prompt = models.CharField(max_length=500, blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -24,16 +27,17 @@ class AiInfo(models.Model):
         verbose_name_plural = '5️⃣ 🤖 AI - AI 정보'
 
 
-class Albums(models.Model):
+class Albums(TrackableMixin, models.Model):
     album_id = models.BigAutoField(primary_key=True)
     artist = models.ForeignKey('Artists', models.DO_NOTHING, blank=True, null=True)
     album_name = models.CharField(max_length=200, blank=True, null=True)
     album_image = models.CharField(max_length=255, blank=True, null=True)
     image_square = models.TextField(blank=True, null=True)  # 220x220 사각형 이미지
     image_large_square = models.TextField(blank=True, null=True)  # 360x360 사각형 이미지
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -42,16 +46,17 @@ class Albums(models.Model):
         verbose_name_plural = '2️⃣ 🎵 MUSIC - 앨범'
 
 
-class Artists(models.Model):
+class Artists(TrackableMixin, models.Model):
     artist_id = models.BigAutoField(primary_key=True)
     artist_name = models.CharField(max_length=100)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
     artist_image = models.TextField(blank=True, null=True)
     image_large_circle = models.TextField(blank=True, null=True)  # 228x228 원형 이미지
     image_small_circle = models.TextField(blank=True, null=True)  # 208x208 원형 이미지
     image_square = models.TextField(blank=True, null=True)  # 220x220 사각형 이미지
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -129,7 +134,7 @@ class AuthUserUserPermissions(models.Model):
         unique_together = (('user', 'permission'),)
 
 
-class Charts(models.Model):
+class Charts(TrackableMixin, models.Model):
     """
     차트 스냅샷 테이블
     - realtime: 실시간 차트 (10분마다 갱신, 최근 3시간 집계)
@@ -148,9 +153,10 @@ class Charts(models.Model):
     chart_date = models.DateTimeField(blank=True, null=True)
     rank = models.IntegerField(blank=True, null=True)
     type = models.TextField(choices=CHART_TYPE_CHOICES, blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -249,12 +255,13 @@ class DjangoSession(models.Model):
         db_table = 'django_session'
 
 
-class Genres(models.Model):
+class Genres(TrackableMixin, models.Model):
     genre_id = models.AutoField(primary_key=True)
     genre_name = models.CharField(max_length=50, blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -263,7 +270,7 @@ class Genres(models.Model):
         verbose_name_plural = '2️⃣ 🎵 MUSIC - 장르'
 
 
-class Music(models.Model):
+class Music(TrackableMixin, models.Model):
     music_id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey('Users', models.DO_NOTHING, blank=True, null=True)
     artist = models.ForeignKey(Artists, models.DO_NOTHING, blank=True, null=True)
@@ -274,12 +281,13 @@ class Music(models.Model):
     genre = models.CharField(max_length=50, blank=True, null=True)
     duration = models.IntegerField(blank=True, null=True)
     lyrics = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
     valence = models.DecimalField(max_digits=10, decimal_places=6, blank=True, null=True)
     arousal = models.DecimalField(max_digits=10, decimal_places=6, blank=True, null=True)
     itunes_id = models.BigIntegerField(blank=True, null=True)
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -288,13 +296,14 @@ class Music(models.Model):
         verbose_name_plural = '2️⃣ 🎵 MUSIC - 음악'
 
 
-class MusicLikes(models.Model):
+class MusicLikes(TrackableMixin, models.Model):
     like_id = models.AutoField(primary_key=True)
     user = models.ForeignKey('Users', models.DO_NOTHING, blank=True, null=True)
     music = models.ForeignKey(Music, models.DO_NOTHING, blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -303,12 +312,13 @@ class MusicLikes(models.Model):
         verbose_name_plural = '4️⃣ 📊 ANALYTICS - 음악 좋아요'
 
 
-class MusicTags(models.Model):
+class MusicTags(TrackableMixin, models.Model):
     tag = models.ForeignKey('Tags', models.DO_NOTHING)
     music = models.OneToOneField(Music, models.DO_NOTHING, primary_key=True)  # The composite primary key (music_id, tag_id) found, that is not supported. The first column is selected.
-    created_at = models.DateTimeField()
-    updated_at = models.DateTimeField()
-    is_deleted = models.BooleanField()
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -318,7 +328,7 @@ class MusicTags(models.Model):
         verbose_name_plural = '2️⃣ 🎵 MUSIC - 음악 태그'
 
 
-class PlayLogs(models.Model):
+class PlayLogs(TrackableMixin, models.Model):
     """
     재생 기록 테이블
     - 사용자가 음악을 재생할 때마다 기록
@@ -329,9 +339,10 @@ class PlayLogs(models.Model):
     music = models.ForeignKey(Music, models.DO_NOTHING)  # 필수
     user = models.ForeignKey('Users', models.DO_NOTHING)  # 필수 (로그인 필수 서비스)
     played_at = models.DateTimeField()  # 재생 시점
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(default=False)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -340,14 +351,15 @@ class PlayLogs(models.Model):
         verbose_name_plural = '4️⃣ 📊 ANALYTICS - 재생 기록'
 
 
-class PlaylistItems(models.Model):
+class PlaylistItems(TrackableMixin, models.Model):
     item_id = models.AutoField(primary_key=True)
     music = models.ForeignKey(Music, models.DO_NOTHING, blank=True, null=True)
     playlist = models.ForeignKey('Playlists', models.DO_NOTHING, blank=True, null=True)
     order = models.IntegerField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -356,13 +368,14 @@ class PlaylistItems(models.Model):
         verbose_name_plural = '3️⃣ 📝 PLAYLIST - 플레이리스트 항목'
 
 
-class PlaylistLikes(models.Model):
+class PlaylistLikes(TrackableMixin, models.Model):
     like_id = models.AutoField(primary_key=True)
     user = models.ForeignKey('Users', models.DO_NOTHING, blank=True, null=True)
     playlist = models.ForeignKey('Playlists', models.DO_NOTHING, blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -371,14 +384,15 @@ class PlaylistLikes(models.Model):
         verbose_name_plural = '3️⃣ 📝 PLAYLIST - 플레이리스트 좋아요'
 
 
-class Playlists(models.Model):
+class Playlists(TrackableMixin, models.Model):
     playlist_id = models.AutoField(primary_key=True)
     user = models.ForeignKey('Users', models.DO_NOTHING, blank=True, null=True)
     title = models.CharField(max_length=100, blank=True, null=True)
     visibility = models.TextField(blank=True, null=True)  # This field type is a guess.
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -387,12 +401,13 @@ class Playlists(models.Model):
         verbose_name_plural = '3️⃣ 📝 PLAYLIST - 플레이리스트'
 
 
-class Tags(models.Model):
+class Tags(TrackableMixin, models.Model):
     tag_id = models.BigAutoField(primary_key=True)
     tag_key = models.TextField(unique=True)
-    created_at = models.DateTimeField()
-    updated_at = models.DateTimeField()
-    is_deleted = models.BooleanField()
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -401,14 +416,15 @@ class Tags(models.Model):
         verbose_name_plural = '2️⃣ 🎵 MUSIC - 태그'
 
 
-class Users(models.Model):
+class Users(TrackableMixin, models.Model):
     user_id = models.BigAutoField(primary_key=True)
     email = models.CharField(max_length=100)
     password = models.CharField(max_length=150)
     nickname = models.CharField(max_length=50, blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False
@@ -417,12 +433,13 @@ class Users(models.Model):
         verbose_name_plural = '1️⃣ 👤 USER - 사용자'
 
 
-class UsersGenre(models.Model):
+class UsersGenre(TrackableMixin, models.Model):
     user = models.OneToOneField(Users, models.DO_NOTHING, primary_key=True)  # The composite primary key (user_id, genre_id) found, that is not supported. The first column is selected.
     genre = models.ForeignKey(Genres, models.DO_NOTHING)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
 
     class Meta:
         managed = False

@@ -303,7 +303,8 @@ class MusicListView(APIView):
     )
     def get(self, request):
         """음악 목록 조회 (필터링 및 정렬)"""
-        queryset = Music.objects.filter(is_deleted=False)
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        queryset = Music.objects.all()
         
         # is_ai 필터링
         is_ai = request.query_params.get('is_ai')
@@ -353,10 +354,8 @@ class MusicDetailView(APIView):
     def get(self, request, music_id):
         """음악 상세 정보 조회"""
         try:
-            music = Music.objects.select_related('artist', 'album').get(
-                music_id=music_id, 
-                is_deleted=False
-            )
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+            music = Music.objects.select_related('artist', 'album').get(music_id=music_id)
             serializer = MusicGenerateResponseSerializer(music)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Music.DoesNotExist:
