@@ -38,6 +38,20 @@ class TagStatSerializer(serializers.Serializer):
     play_count = serializers.IntegerField(help_text="재생 횟수")
 
 
+class TrackStatSerializer(serializers.Serializer):
+    """음악 통계"""
+    rank = serializers.IntegerField(help_text="순위")
+    music_id = serializers.IntegerField(help_text="음악 ID")
+    music_name = serializers.CharField(help_text="음악명")
+    artist_id = serializers.IntegerField(allow_null=True, help_text="아티스트 ID")
+    artist_name = serializers.CharField(allow_null=True, help_text="아티스트명")
+    album_id = serializers.IntegerField(allow_null=True, help_text="앨범 ID")
+    album_name = serializers.CharField(allow_null=True, help_text="앨범명")
+    album_image = serializers.CharField(allow_null=True, help_text="앨범 이미지 URL")
+    play_count = serializers.IntegerField(help_text="재생 횟수")
+    percentage = serializers.FloatField(help_text="비율 (%)")
+
+
 class AIGenerationStatSerializer(serializers.Serializer):
     """AI 생성 활동 통계"""
     total_generated = serializers.IntegerField(help_text="생성한 AI 곡 수")

@@ -15,6 +15,7 @@ from music.serializers.statistics import (
     GenreStatSerializer,
     ArtistStatSerializer,
     TagStatSerializer,
+    TrackStatSerializer,
     AIGenerationStatSerializer
 )
 
@@ -296,6 +297,57 @@ class UserTopTagsView(APIView):
             logger.error(f"[UserTopTags] 조회 실패: user_id={user_id}, error={e}")
             return Response(
                 {'error': '태그 통계를 조회하는 중 오류가 발생했습니다.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+@extend_schema(tags=['사용자 통계'])
+class UserTopTracksView(APIView):
+    """
+    사용자 Top 음악 차트 API
+    
+    GET /api/users/{user_id}/statistics/tracks/
+    """
+    
+    @extend_schema(
+        summary="사용자 Top 음악 차트 조회",
+        description="사용자가 가장 많이 들은 음악 목록을 재생 횟수 순으로 반환합니다. (기본 Top 15)",
+        parameters=[
+            OpenApiParameter(
+                name='period',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='조회 기간: "month" (이번 달, 기본값) 또는 "all" (전체)',
+                required=False,
+                default='month',
+                examples=[
+                    OpenApiExample(name='이번 달', value='month'),
+                    OpenApiExample(name='전체 기간', value='all'),
+                ]
+            ),
+            OpenApiParameter(
+                name='limit',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='반환할 Top 음악 수 (기본값: 15)',
+                required=False,
+                default=15
+            )
+        ],
+        responses={200: TrackStatSerializer(many=True)}
+    )
+    def get(self, request, user_id: int):
+        period = request.query_params.get('period', 'month')
+        limit = int(request.query_params.get('limit', 15))
+        
+        try:
+            data = UserStatisticsService.get_top_tracks(user_id, period, limit)
+            serializer = TrackStatSerializer(data, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"[UserTopTracks] 조회 실패: user_id={user_id}, error={e}")
+            return Response(
+                {'error': '음악 차트를 조회하는 중 오류가 발생했습니다.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

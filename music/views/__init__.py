@@ -45,6 +45,7 @@ from .statistics import (
     UserTopGenresView,
     UserTopArtistsView,
     UserTopTagsView,
+    UserTopTracksView,
     UserAIGenerationView,
 )
 
@@ -102,6 +103,7 @@ __all__ = [
     'UserTopGenresView',
     'UserTopArtistsView',
     'UserTopTagsView',
+    'UserTopTracksView',
     'UserAIGenerationView',
     # playlist
     'PlaylistListCreateView',
