@@ -16,10 +16,10 @@ from typing import Dict, Optional, Tuple
 from django.utils import timezone
 from django.db import transaction
 
-from ..models import Music, AiInfo, Users, Artists, Albums
-from ..music_generate.services import LlamaService, SunoAPIService
-from ..music_generate.utils import extract_genre_from_prompt
-from ..music_generate.exceptions import (
+from music.models import Music, AiInfo, Users, Artists, Albums
+from music.music_generate.services import LlamaService, SunoAPIService
+from music.music_generate.utils import extract_genre_from_prompt
+from music.music_generate.exceptions import (
     SunoAPIError, 
     SunoCreditInsufficientError, 
     SunoAuthenticationError
@@ -387,8 +387,8 @@ class AiMusicGenerationService:
         audio_url: Optional[str]
     ):
         """비동기 작업 큐잉 (타임스탬프 가사, S3 업로드)"""
-        from ..tasks import upload_suno_audio_to_s3_task, fetch_timestamped_lyrics_task
-        from ..utils.s3_upload import is_suno_url, is_s3_url
+        from music.tasks import upload_suno_audio_to_s3_task, fetch_timestamped_lyrics_task
+        from music.utils.s3_upload import is_suno_url, is_s3_url
         
         # 타임스탬프 가사 조회
         if not make_instrumental and task_id and task_id != 'unknown' and audio_url:
