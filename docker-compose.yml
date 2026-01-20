@@ -55,6 +55,20 @@ services:
         condition: service_healthy # DB가 healthy 상태일 때만 시작
       rabbitmq:
         condition: service_started # RabbitMQ가 시작되면 시작
+  # Celery Beat (주기적 작업 스케줄러)
+  # Celery Beat 서비스 (주기적 작업 스케줄러)
+  celery-beat:
+    build: .
+    command: celery -A config beat -l info
+    volumes:
+      - ./:/usr/src/app/
+    env_file:
+      - ./.env
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
 
   # Flower 서비스 (Celery 모니터링 웹 UI)
   flower:
