@@ -10,6 +10,7 @@ from .views import (
     TokenRefreshView,
     MusicLikeView,
     MusicSearchView,
+    AiMusicSearchView,
     MusicDetailView as iTunesMusicDetailView,  # iTunes 기반 상세 조회 (기존)
     ArtistDetailView,
     ArtistTracksView,
@@ -67,6 +68,10 @@ urlpatterns = [
     # iTunes 기반 검색 (새로운 메인 검색)
     # GET /api/v1/search?q={검색어}&exclude_ai={true|false}
     path('search', MusicSearchView.as_view(), name='itunes-search'),
+    
+    # AI 음악 검색 (AI 음악 전용)
+    # GET /api/music/search-ai/?q={검색어}
+    path('search-ai/', AiMusicSearchView.as_view(), name='ai-music-search'),
     
     # iTunes ID 기반 상세 조회 (DB에 없으면 자동 저장)
     # GET /api/v1/tracks/{itunes_id}
