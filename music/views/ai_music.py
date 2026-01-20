@@ -23,7 +23,7 @@ from ..serializers.ai_music import (
     MusicListSerializer,
     SunoTaskStatusResponseSerializer
 )
-from ..services.ai_music_service import AiMusicGenerationService
+from ..services import AiMusicGenerationService
 from ..music_generate.services import SunoAPIService
 from ..music_generate.exceptions import (
     SunoCreditInsufficientError,
