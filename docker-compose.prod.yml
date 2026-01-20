@@ -39,6 +39,17 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+  # Celery Beat (주기적 작업 스케줄러)
+  celery-beat:
+    image: hhyuninu/2025_techeer_team_i:latest
+    command: celery -A config beat -l info
+    env_file:
+      - .env.production  # 프로덕션 환경 변수 파일 (서버에 업로드 필요)
+    depends_on:
+      - rabbitmq
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
 
   # Flower (Celery 모니터링)
   flower:
@@ -54,7 +65,22 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
-
+# Ngrok 터널 서비스 (웹훅 콜백용)
+  ngrok:
+    image: ngrok/ngrok:latest
+    command:
+      - http
+      - backend:8000
+      - --log=stdout
+    ports:
+      - "4040:4040"  # ngrok 웹 UI 포트
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+    depends_on:
+      - backend
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
   # ===== 모니터링 스택 =====
 
   # Prometheus - 메트릭 수집 및 저장

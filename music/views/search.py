@@ -1,5 +1,5 @@
 """
-검색 관련 Views - iTunes 기반 음악 검색
+검색 관련 Views - iTunes 기반 음악 검색 및 AI 음악 검색
 """
 import re
 from rest_framework import status
@@ -7,10 +7,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from django.utils import timezone
+from django.db.models import Q, Prefetch
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
-from ..models import Music, MusicTags, Tags, Artists, Albums
-from ..serializers import iTunesSearchResultSerializer
+from ..models import Music, MusicTags, Tags, Artists, Albums, AiInfo
+from ..serializers import iTunesSearchResultSerializer, AiMusicSearchResultSerializer
 from ..services import iTunesService
 from ..tasks import fetch_artist_image_task, fetch_album_image_task
 from .common import MusicPagination
@@ -19,13 +20,12 @@ from .common import MusicPagination
 class MusicSearchView(APIView):
     """
     iTunes API 기반 음악 검색
-    
+
     - 검색어 파싱: 일반 검색어 + 태그 (#으로 구분)
     - iTunes API 우선 호출
     - 태그 필터링 지원
-    - AI 필터링 지원
-    
-    GET /api/v1/search?q={검색어}&exclude_ai={true|false}&page={num}&page_size={num}
+
+    GET /api/v1/search?q={검색어}&page={num}&page_size={num}
     """
     permission_classes = [AllowAny]
     pagination_class = MusicPagination
@@ -75,7 +75,6 @@ class MusicSearchView(APIView):
         **동작:**
         1. 일반 검색어가 있으면 iTunes API 호출
         2. 태그가 있으면 DB에서 해당 태그를 가진 곡과 매칭
-        3. exclude_ai=true 시 AI 생성곡 제외
         """,
         parameters=[
             OpenApiParameter(
@@ -108,14 +107,6 @@ class MusicSearchView(APIView):
                 ]
             ),
             OpenApiParameter(
-                name='exclude_ai',
-                type=OpenApiTypes.BOOL,
-                location=OpenApiParameter.QUERY,
-                description='AI 생성곡 제외 여부 (기본값: false - AI곡 포함)\n응답의 is_ai 필드로 클라이언트 사이드 필터링도 가능',
-                required=False,
-                default=False
-            ),
-            OpenApiParameter(
                 name='page',
                 type=OpenApiTypes.INT,
                 location=OpenApiParameter.QUERY,
@@ -142,7 +133,6 @@ class MusicSearchView(APIView):
     def get(self, request):
         """음악 검색 처리"""
         query = request.query_params.get('q', '')
-        exclude_ai = request.query_params.get('exclude_ai', 'false').lower() == 'true'
         
         if not query:
             return Response(
@@ -298,9 +288,6 @@ class MusicSearchView(APIView):
                     itunes_id__in=itunes_ids_with_tags
                 ).select_related('artist', 'album')
                 
-                if exclude_ai:
-                    musics = musics.filter(is_ai=False)
-                
                 # Music 객체를 iTunes 검색 결과 형식으로 변환
                 results = []
                 for music in musics:
@@ -315,14 +302,10 @@ class MusicSearchView(APIView):
                         'duration': music.duration,
                         'audio_url': music.audio_url,
                         'album_image': music.album.album_image if music.album else '',
-                        'is_ai': music.is_ai,
                         'in_db': True,
                         'has_matching_tags': True,
                     })
         
-        # 3. AI 필터 적용
-        if exclude_ai:
-            results = [r for r in results if not r.get('is_ai', False)]
         
         # 4. 페이지네이션
         paginator = self.pagination_class()
@@ -337,5 +320,126 @@ class MusicSearchView(APIView):
         serializer = iTunesSearchResultSerializer(results, many=True)
         return Response({
             'count': len(results),
+            'results': serializer.data
+        })
+
+
+class AiMusicSearchView(APIView):
+    """
+    AI 음악 전용 검색 API
+    
+    - AiInfo 테이블에서 검색 (노래 제목과 input_prompt 필드)
+    - is_ai=True인 음악만 반환
+    - 검색된 AI 음악 결과들을 반환
+    
+    GET /api/music/search-ai/?q={검색어}
+    """
+    permission_classes = [AllowAny]
+    pagination_class = MusicPagination
+    
+    @extend_schema(
+        summary="AI 음악 검색",
+        description="""
+        AI로 생성된 음악 전용 검색 API
+
+        **검색 대상:**
+        - 노래 제목 (Music.music_name)
+        - AI 생성 프롬프트 (AiInfo.input_prompt)
+
+        **검색 조건:**
+        - AiInfo 레코드가 있는 음악만 검색 (AI 생성 음악)
+        - 노래 제목 또는 프롬프트에 검색어가 포함된 경우 (대소문자 구분 없음)
+        - 하나의 검색어로 통합 검색
+
+        **정렬:**
+        - 최신 생성 순 (created_at DESC)
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='q',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='검색어 (노래 제목 또는 AI 생성 프롬프트)',
+                required=True,
+                examples=[
+                    OpenApiExample(
+                        name='노래 제목 검색',
+                        value='사랑',
+                        description='노래 제목에 "사랑"이 포함된 AI 음악 검색'
+                    ),
+                    OpenApiExample(
+                        name='프롬프트 검색',
+                        value='신나는',
+                        description='AI 생성 프롬프트에 "신나는"이 포함된 음악 검색'
+                    ),
+                ]
+            ),
+            OpenApiParameter(
+                name='page',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='페이지 번호',
+                required=False,
+                default=1
+            ),
+            OpenApiParameter(
+                name='page_size',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='페이지 크기 (최대 100)',
+                required=False,
+                default=20
+            ),
+        ],
+        responses={
+            200: AiMusicSearchResultSerializer(many=True),
+            400: {'description': 'Bad Request - q 파라미터 필요'},
+        },
+        tags=['검색']
+    )
+    def get(self, request):
+        """AI 음악 검색 처리"""
+        query = request.query_params.get('q', '').strip()
+        
+        if not query:
+            return Response(
+                {'error': 'q 파라미터가 필요합니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # AI 음악만 검색 (AiInfo가 있는 음악)
+        # 노래 제목과 프롬프트를 하나의 검색어로 통합 검색
+        music_queryset = Music.objects.filter(
+            # AiInfo 레코드가 있는 음악만 (AI 생성 음악)
+            aiinfo__isnull=False
+        ).filter(
+            # 삭제되지 않은 AiInfo만
+            aiinfo__is_deleted__in=[False, None]
+        ).filter(
+            # 노래 제목 또는 AI 프롬프트에서 검색 (통합 검색)
+            Q(music_name__icontains=query) |
+            Q(aiinfo__input_prompt__icontains=query)
+        ).select_related(
+            'artist',  # 아티스트 정보
+            'album',   # 앨범 정보
+        ).prefetch_related(
+            Prefetch(
+                'aiinfo_set',
+                queryset=AiInfo.objects.filter(is_deleted__in=[False, None]),
+                to_attr='ai_info_list'
+            )
+        ).distinct().order_by('-created_at')  # 최신순 정렬
+        
+        # 페이지네이션
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(music_queryset, request)
+        
+        if page is not None:
+            serializer = AiMusicSearchResultSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+        
+        serializer = AiMusicSearchResultSerializer(music_queryset, many=True)
+        return Response({
+            'count': music_queryset.count(),
             'results': serializer.data
         })
