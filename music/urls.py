@@ -26,6 +26,7 @@ from .views import (
     UserTopGenresView,
     UserTopArtistsView,
     UserTopTagsView,
+    UserTopTracksView,
     UserAIGenerationView,
     # 플레이리스트
     PlaylistListCreateView,
@@ -170,6 +171,10 @@ urlpatterns = [
     # Top 태그(분위기/키워드) 통계
     # GET /api/v1/users/{user_id}/statistics/tags/?limit=6
     path('users/<int:user_id>/statistics/tags/', UserTopTagsView.as_view(), name='user-top-tags'),
+    
+    # Top 음악 차트
+    # GET /api/v1/users/{user_id}/statistics/tracks/?limit=15
+    path('users/<int:user_id>/statistics/tracks/', UserTopTracksView.as_view(), name='user-top-tracks'),
     
     # AI 생성 활동 통계
     # GET /api/v1/users/{user_id}/statistics/ai-generation/
