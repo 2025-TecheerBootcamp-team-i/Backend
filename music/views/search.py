@@ -19,13 +19,12 @@ from .common import MusicPagination
 class MusicSearchView(APIView):
     """
     iTunes API 기반 음악 검색
-    
+
     - 검색어 파싱: 일반 검색어 + 태그 (#으로 구분)
     - iTunes API 우선 호출
     - 태그 필터링 지원
-    - AI 필터링 지원
-    
-    GET /api/v1/search?q={검색어}&exclude_ai={true|false}&page={num}&page_size={num}
+
+    GET /api/v1/search?q={검색어}&page={num}&page_size={num}
     """
     permission_classes = [AllowAny]
     pagination_class = MusicPagination
@@ -75,7 +74,6 @@ class MusicSearchView(APIView):
         **동작:**
         1. 일반 검색어가 있으면 iTunes API 호출
         2. 태그가 있으면 DB에서 해당 태그를 가진 곡과 매칭
-        3. exclude_ai=true 시 AI 생성곡 제외
         """,
         parameters=[
             OpenApiParameter(
@@ -108,14 +106,6 @@ class MusicSearchView(APIView):
                 ]
             ),
             OpenApiParameter(
-                name='exclude_ai',
-                type=OpenApiTypes.BOOL,
-                location=OpenApiParameter.QUERY,
-                description='AI 생성곡 제외 여부 (기본값: false - AI곡 포함)\n응답의 is_ai 필드로 클라이언트 사이드 필터링도 가능',
-                required=False,
-                default=False
-            ),
-            OpenApiParameter(
                 name='page',
                 type=OpenApiTypes.INT,
                 location=OpenApiParameter.QUERY,
@@ -142,7 +132,6 @@ class MusicSearchView(APIView):
     def get(self, request):
         """음악 검색 처리"""
         query = request.query_params.get('q', '')
-        exclude_ai = request.query_params.get('exclude_ai', 'false').lower() == 'true'
         
         if not query:
             return Response(
@@ -298,9 +287,6 @@ class MusicSearchView(APIView):
                     itunes_id__in=itunes_ids_with_tags
                 ).select_related('artist', 'album')
                 
-                if exclude_ai:
-                    musics = musics.filter(is_ai=False)
-                
                 # Music 객체를 iTunes 검색 결과 형식으로 변환
                 results = []
                 for music in musics:
@@ -315,14 +301,10 @@ class MusicSearchView(APIView):
                         'duration': music.duration,
                         'audio_url': music.audio_url,
                         'album_image': music.album.album_image if music.album else '',
-                        'is_ai': music.is_ai,
                         'in_db': True,
                         'has_matching_tags': True,
                     })
         
-        # 3. AI 필터 적용
-        if exclude_ai:
-            results = [r for r in results if not r.get('is_ai', False)]
         
         # 4. 페이지네이션
         paginator = self.pagination_class()
