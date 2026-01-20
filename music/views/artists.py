@@ -10,6 +10,7 @@ from drf_spectacular.utils import extend_schema
 from ..models import Artists, Music, Albums, PlayLogs
 from ..serializers import ArtistSerializer
 from ..serializers.base import AlbumDetailSerializer
+from ..utils.s3_upload import is_s3_url
 from django.db.models import Count
 from drf_spectacular.utils import OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
@@ -97,24 +98,27 @@ class ArtistTracksView(APIView):
                 seconds = track.duration % 60
                 duration_str = f"{minutes}:{seconds:02d}"
 
-            # 앨범 이미지: image_square가 있으면 사용, 없으면 album_image를 리사이징 URL로 변환
+            # 앨범 이미지: S3 URL 우선 사용
             album_image = None
             if track.album:
-                if track.album.image_square:
+                # 1순위: image_square가 있고 S3 URL이면 사용
+                if track.album.image_square and is_s3_url(track.album.image_square):
                     album_image = track.album.image_square
+                # 2순위: image_large_square가 있고 S3 URL이면 사용
+                elif track.album.image_large_square and is_s3_url(track.album.image_large_square):
+                    album_image = track.album.image_large_square
+                # 3순위: album_image가 있고 S3 URL이면 사용
+                elif track.album.album_image and is_s3_url(track.album.album_image):
+                    album_image = track.album.album_image
+                # 4순위: image_square가 있으면 사용 (외부 URL이어도)
+                elif track.album.image_square:
+                    album_image = track.album.image_square
+                # 5순위: image_large_square가 있으면 사용 (외부 URL이어도)
+                elif track.album.image_large_square:
+                    album_image = track.album.image_large_square
+                # 최후: album_image 반환 (외부 URL이어도)
                 elif track.album.album_image:
-                    # 원본 URL을 리사이징 URL로 변환
-                    # media/images/albums/original/xxx.jpg -> media/images/albums/square/220x220/xxx.jpg
-                    original_url = track.album.album_image
-                    if '/original/' in original_url:
-                        # 파일명 추출 및 확장자 변경
-                        filename = original_url.split('/')[-1]
-                        filename_without_ext = filename.rsplit('.', 1)[0]
-                        square_filename = f"{filename_without_ext}.jpg"
-                        # 경로 변환
-                        album_image = original_url.replace('/original/', '/square/220x220/').replace(filename, square_filename)
-                    else:
-                        album_image = track.album.album_image
+                    album_image = track.album.album_image
             
             tracks_data.append({
                 "id": str(track.music_id),
@@ -172,22 +176,25 @@ class ArtistAlbumsView(APIView):
             if album.created_at:
                 year = str(album.created_at.year)
 
-            # 앨범 이미지: image_square가 있으면 사용, 없으면 album_image를 리사이징 URL로 변환
-            if album.image_square:
+            # 앨범 이미지: S3 URL 우선 사용
+            # 1순위: image_square가 있고 S3 URL이면 사용
+            if album.image_square and is_s3_url(album.image_square):
                 album_image = album.image_square
+            # 2순위: image_large_square가 있고 S3 URL이면 사용
+            elif album.image_large_square and is_s3_url(album.image_large_square):
+                album_image = album.image_large_square
+            # 3순위: album_image가 있고 S3 URL이면 사용
+            elif album.album_image and is_s3_url(album.album_image):
+                album_image = album.album_image
+            # 4순위: image_square가 있으면 사용 (외부 URL이어도)
+            elif album.image_square:
+                album_image = album.image_square
+            # 5순위: image_large_square가 있으면 사용 (외부 URL이어도)
+            elif album.image_large_square:
+                album_image = album.image_large_square
+            # 최후: album_image 반환 (외부 URL이어도)
             elif album.album_image:
-                # 원본 URL을 리사이징 URL로 변환
-                # media/images/albums/original/xxx.jpg -> media/images/albums/square/220x220/xxx.jpg
-                original_url = album.album_image
-                if '/original/' in original_url:
-                    # 파일명 추출 및 확장자 변경
-                    filename = original_url.split('/')[-1]
-                    filename_without_ext = filename.rsplit('.', 1)[0]
-                    square_filename = f"{filename_without_ext}.jpg"
-                    # 경로 변환
-                    album_image = original_url.replace('/original/', '/square/220x220/').replace(filename, square_filename)
-                else:
-                    album_image = album.album_image
+                album_image = album.album_image
             else:
                 album_image = None
             

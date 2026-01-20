@@ -13,7 +13,47 @@ from ..models import Music, MusicTags, Tags, Artists, Albums
 from ..serializers import iTunesSearchResultSerializer
 from ..services import iTunesService
 from ..tasks import fetch_artist_image_task, fetch_album_image_task
+from ..utils.s3_upload import is_s3_url
 from .common import MusicPagination
+
+
+def get_album_image_url(album):
+    """
+    앨범 이미지 URL 반환 (S3 URL 우선)
+    
+    우선순위:
+    1. image_square (S3 URL)
+    2. image_large_square (S3 URL)
+    3. album_image (S3 URL)
+    4. image_square (외부 URL)
+    5. image_large_square (외부 URL)
+    6. album_image (외부 URL)
+    """
+    if not album:
+        return ''
+    
+    # 1순위: image_square가 있고 S3 URL이면 사용
+    if album.image_square and is_s3_url(album.image_square):
+        return album.image_square
+    
+    # 2순위: image_large_square가 있고 S3 URL이면 사용
+    if album.image_large_square and is_s3_url(album.image_large_square):
+        return album.image_large_square
+    
+    # 3순위: album_image가 있고 S3 URL이면 사용
+    if album.album_image and is_s3_url(album.album_image):
+        return album.album_image
+    
+    # 4순위: image_square가 있으면 사용 (외부 URL이어도)
+    if album.image_square:
+        return album.image_square
+    
+    # 5순위: image_large_square가 있으면 사용 (외부 URL이어도)
+    if album.image_large_square:
+        return album.image_large_square
+    
+    # 최후: album_image 반환 (외부 URL이어도)
+    return album.album_image or ''
 
 
 class MusicSearchView(APIView):
@@ -318,7 +358,7 @@ class MusicSearchView(APIView):
                         'genre': music.genre or '',
                         'duration': music.duration,
                         'audio_url': music.audio_url,
-                        'album_image': music.album.album_image if music.album else '',
+                        'album_image': get_album_image_url(music.album),
                         'is_ai': music.is_ai,
                         'in_db': True,
                         'has_matching_tags': True,

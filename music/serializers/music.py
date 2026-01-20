@@ -56,11 +56,26 @@ class MusicPlaySerializer(serializers.ModelSerializer):
     artist_name = serializers.CharField(source='artist.artist_name', read_only=True)
     album_name = serializers.CharField(source='album.album_name', read_only=True)
     album_image = serializers.CharField(source='album.album_image', read_only=True)
+    album_image_large_square = serializers.CharField(
+        source='album.image_large_square',
+        read_only=True,
+        allow_null=True,
+        help_text='앨범의 360x360 정사각형 커버 이미지 URL (없을 수 있음)',
+    )
     
     class Meta:
         model = Music
         fields = [
-            'music_id', 'music_name', 'artist_name', 'album_name', 
-            'album_image', 'audio_url', 'duration', 'genre', 
-            'is_ai', 'lyrics', 'itunes_id'
+            'music_id',
+            'music_name',
+            'artist_name',
+            'album_name',
+            'album_image',
+            'album_image_large_square',
+            'audio_url',
+            'duration',
+            'genre',
+            'is_ai',
+            'lyrics',
+            'itunes_id',
         ]

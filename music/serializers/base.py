@@ -3,6 +3,7 @@
 """
 from rest_framework import serializers
 from ..models import Artists, Albums, Tags, AiInfo
+from ..utils.s3_upload import is_s3_url
 
 
 class ArtistSerializer(serializers.ModelSerializer):
@@ -27,7 +28,10 @@ class AlbumSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Albums
-        fields = ['album_id', 'album_name', 'album_image']
+        # 기본 앨범 정보에 더해, 360x360 정사각형 이미지 URL도 함께 내려준다.
+        # 프론트에서는 image_large_square를 우선 사용하고,
+        # 필요 시 기존 album_image(iTunes 원본 등)를 폴백으로 사용할 수 있다.
+        fields = ['album_id', 'album_name', 'album_image', 'image_large_square']
 
 
 class AlbumDetailSerializer(serializers.ModelSerializer):
@@ -50,11 +54,34 @@ class AlbumDetailSerializer(serializers.ModelSerializer):
         ]
     
     def get_album_image(self, obj):
-        """image_square가 있으면 사용, 없으면 원본 album_image 사용"""
-        # RDS에서 image_square 필드 값을 직접 가져옴
+        """
+        앨범 이미지 반환 우선순위:
+        1. image_square (S3 URL 우선)
+        2. image_large_square (S3 URL 우선)
+        3. album_image (S3 URL 우선)
+        4. 외부 URL은 최후의 수단으로만 사용
+        """
+        # 1순위: image_square가 있고 S3 URL이면 사용
+        if obj.image_square and is_s3_url(obj.image_square):
+            return obj.image_square
+        
+        # 2순위: image_large_square가 있고 S3 URL이면 사용
+        if obj.image_large_square and is_s3_url(obj.image_large_square):
+            return obj.image_large_square
+        
+        # 3순위: album_image가 있고 S3 URL이면 사용
+        if obj.album_image and is_s3_url(obj.album_image):
+            return obj.album_image
+        
+        # 4순위: image_square가 있으면 사용 (외부 URL이어도)
         if obj.image_square:
             return obj.image_square
-        # 없으면 원본 album_image 사용
+        
+        # 5순위: image_large_square가 있으면 사용 (외부 URL이어도)
+        if obj.image_large_square:
+            return obj.image_large_square
+        
+        # 최후: album_image 반환 (외부 URL이어도)
         return obj.album_image
     
     def get_image_large_square(self, obj):

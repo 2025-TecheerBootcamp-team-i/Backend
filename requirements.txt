@@ -29,6 +29,7 @@ Pillow                              # 이미지 처리 (썸네일, 리사이징)
 # 외부 API 연동
 # ==============================================
 requests                            # HTTP 클라이언트 (iTunes, LRCLIB, Suno API)
+ytmusicapi                          # YouTube Music API (아티스트 이미지 수집)
 
 # ==============================================
 # AI 음악 생성 (LangChain + Ollama)

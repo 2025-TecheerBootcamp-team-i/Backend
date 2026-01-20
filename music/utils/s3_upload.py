@@ -7,6 +7,8 @@ from django.conf import settings
 from django.utils import timezone
 from botocore.exceptions import ClientError, BotoCoreError
 import logging
+from PIL import Image
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -176,16 +178,116 @@ def is_s3_url(url: str) -> bool:
     return 's3.amazonaws.com' in url or '.s3.' in url or settings.AWS_STORAGE_BUCKET_NAME in url
 
 
+def resize_to_square(image_content: bytes, size: int) -> bytes:
+    """
+    이미지를 정사각형으로 리사이징합니다.
+    
+    Args:
+        image_content: 원본 이미지 바이트 데이터
+        size: 리사이징할 크기 (정사각형)
+        
+    Returns:
+        리사이징된 이미지 바이트 데이터 (JPEG)
+    """
+    # PIL Image로 열기
+    image = Image.open(io.BytesIO(image_content))
+    
+    # 정사각형으로 중앙 크롭
+    width, height = image.size
+    min_dimension = min(width, height)
+    
+    left = (width - min_dimension) // 2
+    top = (height - min_dimension) // 2
+    right = left + min_dimension
+    bottom = top + min_dimension
+    
+    cropped = image.crop((left, top, right, bottom))
+    
+    # 원하는 크기로 리사이징
+    resized = cropped.resize((size, size), Image.Resampling.LANCZOS)
+    
+    # RGB로 변환 (JPEG 저장용)
+    if resized.mode == 'RGBA':
+        rgb_image = Image.new('RGB', resized.size, (255, 255, 255))
+        rgb_image.paste(resized, mask=resized.split()[3])
+        resized = rgb_image
+    elif resized.mode != 'RGB':
+        resized = resized.convert('RGB')
+    
+    # JPEG로 저장
+    img_buffer = io.BytesIO()
+    resized.save(img_buffer, format='JPEG', quality=85, optimize=True)
+    img_buffer.seek(0)
+    
+    return img_buffer.getvalue()
+
+
+def create_circular_image(image_content: bytes, size: int) -> bytes:
+    """
+    이미지를 원형으로 변환합니다.
+    
+    Args:
+        image_content: 원본 이미지 바이트 데이터
+        size: 원형 이미지 크기 (정사각형)
+        
+    Returns:
+        원형 이미지 바이트 데이터 (PNG, 투명 배경)
+    """
+    from PIL import ImageDraw
+    
+    # PIL Image로 열기
+    image = Image.open(io.BytesIO(image_content))
+    
+    # 원본 복사 (원본 변경 방지)
+    img = image.copy()
+    
+    # 1. 정사각형으로 중앙 크롭
+    width, height = img.size
+    min_dimension = min(width, height)
+    
+    left = (width - min_dimension) // 2
+    top = (height - min_dimension) // 2
+    right = left + min_dimension
+    bottom = top + min_dimension
+    
+    cropped = img.crop((left, top, right, bottom))
+    
+    # 2. 원하는 크기로 리사이징
+    cropped = cropped.resize((size, size), Image.Resampling.LANCZOS)
+    
+    # 3. 원형 마스크 생성
+    mask = Image.new('L', (size, size), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0, size, size), fill=255)
+    
+    # 4. 투명 배경 이미지 생성
+    circular_image = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    
+    # 5. 원본을 RGBA로 변환
+    if cropped.mode != 'RGBA':
+        cropped = cropped.convert('RGBA')
+    
+    # 6. 마스크 적용
+    circular_image.paste(cropped, (0, 0), mask)
+    
+    # PNG로 저장
+    img_buffer = io.BytesIO()
+    circular_image.save(img_buffer, format='PNG', optimize=True)
+    img_buffer.seek(0)
+    
+    return img_buffer.getvalue()
+
+
 def upload_image_to_s3(
     image_url: str, 
     image_type: str, 
     entity_id: int, 
     entity_name: str = None
-) -> str:
+) -> dict:
     """
-    이미지 URL을 다운로드하여 S3에 업로드합니다.
+    이미지 URL을 다운로드하여 S3에 업로드하고 로컬에서 리사이징합니다.
     
-    Lambda가 리사이징하도록 media/images/{type}/original/ 경로에 저장합니다.
+    원본과 리사이징된 모든 크기의 이미지를 S3에 업로드합니다.
     
     Args:
         image_url: 다운로드할 이미지 URL
@@ -194,7 +296,7 @@ def upload_image_to_s3(
         entity_name: 엔티티 이름 (파일명에 사용, 없으면 ID만 사용)
         
     Returns:
-        S3 URL (원본 이미지 경로)
+        리사이징된 이미지 URL 딕셔너리
         
     Raises:
         requests.RequestException: 다운로드 실패 시
@@ -238,9 +340,7 @@ def upload_image_to_s3(
         
         timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
         file_name = f"{entity_id}{safe_name}_{timestamp}.{extension}"
-        
-        # S3 키 생성 (Lambda 트리거 경로: media/images/{type}/original/)
-        s3_key = f"media/images/{image_type}/original/{file_name}"
+        filename_without_ext = file_name.rsplit('.', 1)[0]
         
         # S3 클라이언트 생성
         s3_client = boto3.client(
@@ -250,17 +350,6 @@ def upload_image_to_s3(
             region_name=settings.AWS_S3_REGION_NAME
         )
         
-        logger.info(f"[S3 이미지] 업로드 시작: bucket={settings.AWS_STORAGE_BUCKET_NAME}, key={s3_key}")
-        
-        # S3에 업로드
-        s3_client.put_object(
-            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Key=s3_key,
-            Body=image_content,
-            ContentType=content_type,
-            CacheControl='max-age=31536000'  # 1년 캐시
-        )
-        
         # S3 URL 생성 헬퍼 함수
         def get_s3_url(key: str) -> str:
             if hasattr(settings, 'AWS_S3_CUSTOM_DOMAIN') and settings.AWS_S3_CUSTOM_DOMAIN:
@@ -268,40 +357,83 @@ def upload_image_to_s3(
             else:
                 return f'https://{settings.AWS_STORAGE_BUCKET_NAME}.s3.{settings.AWS_S3_REGION_NAME}.amazonaws.com/{key}'
         
-        original_url = get_s3_url(s3_key)
-        logger.info(f"[S3 이미지] 업로드 완료: {original_url}")
+        # 원본 이미지 업로드
+        original_key = f"media/images/{image_type}/original/{file_name}"
+        logger.info(f"[S3 이미지] 원본 업로드 시작: bucket={settings.AWS_STORAGE_BUCKET_NAME}, key={original_key}")
+        s3_client.put_object(
+            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+            Key=original_key,
+            Body=image_content,
+            ContentType=content_type,
+            CacheControl='max-age=31536000'  # 1년 캐시
+        )
+        original_url = get_s3_url(original_key)
+        logger.info(f"[S3 이미지] 원본 업로드 완료: {original_url}")
         
-        # 리사이징된 이미지 URL 생성 (Lambda가 생성할 경로)
-        resized_urls = {}
+        resized_urls = {'original': original_url}
+        
+        # 이미지 타입별 리사이징 및 업로드
         if image_type == 'artists':
-            # 파일명에서 확장자 추출 및 변경
-            filename_without_ext = file_name.rsplit('.', 1)[0]
+            # 원형 이미지 생성 및 업로드 (228x228, 208x208)
+            for size in [228, 208]:
+                logger.info(f"[S3 이미지] 원형 이미지 리사이징 중: {size}x{size}")
+                circular_content = create_circular_image(image_content, size)
+                circular_key = f"media/images/artists/circular/{size}x{size}/{filename_without_ext}.png"
+                
+                s3_client.put_object(
+                    Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+                    Key=circular_key,
+                    Body=circular_content,
+                    ContentType='image/png',
+                    CacheControl='max-age=31536000'
+                )
+                circular_url = get_s3_url(circular_key)
+                logger.info(f"[S3 이미지] 원형 이미지 업로드 완료: {circular_url}")
+                
+                if size == 228:
+                    resized_urls['image_large_circle'] = circular_url
+                elif size == 208:
+                    resized_urls['image_small_circle'] = circular_url
             
-            # 원형 이미지 URL (PNG)
-            large_circle_key = f"media/images/artists/circular/228x228/{filename_without_ext}.png"
-            small_circle_key = f"media/images/artists/circular/208x208/{filename_without_ext}.png"
-            
-            # 사각형 이미지 URL (JPEG)
+            # 사각형 이미지 생성 및 업로드 (220x220)
+            logger.info(f"[S3 이미지] 사각형 이미지 리사이징 중: 220x220")
+            square_content = resize_to_square(image_content, 220)
             square_key = f"media/images/artists/square/220x220/{filename_without_ext}.jpg"
             
-            resized_urls = {
-                'original': original_url,
-                'image_large_circle': get_s3_url(large_circle_key),
-                'image_small_circle': get_s3_url(small_circle_key),
-                'image_square': get_s3_url(square_key),
-            }
+            s3_client.put_object(
+                Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+                Key=square_key,
+                Body=square_content,
+                ContentType='image/jpeg',
+                CacheControl='max-age=31536000'
+            )
+            square_url = get_s3_url(square_key)
+            logger.info(f"[S3 이미지] 사각형 이미지 업로드 완료: {square_url}")
+            resized_urls['image_square'] = square_url
+            
         elif image_type == 'albums':
-            # 파일명에서 확장자 추출 및 변경
-            filename_without_ext = file_name.rsplit('.', 1)[0]
-            
-            # 사각형 이미지 URL (JPEG)
-            square_key = f"media/images/albums/square/220x220/{filename_without_ext}.jpg"
-            
-            resized_urls = {
-                'original': original_url,
-                'image_square': get_s3_url(square_key),
-            }
+            # 사각형 이미지 생성 및 업로드 (220x220, 360x360)
+            for size in [220, 360]:
+                logger.info(f"[S3 이미지] 사각형 이미지 리사이징 중: {size}x{size}")
+                square_content = resize_to_square(image_content, size)
+                square_key = f"media/images/albums/square/{size}x{size}/{filename_without_ext}.jpg"
+                
+                s3_client.put_object(
+                    Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+                    Key=square_key,
+                    Body=square_content,
+                    ContentType='image/jpeg',
+                    CacheControl='max-age=31536000'
+                )
+                square_url = get_s3_url(square_key)
+                logger.info(f"[S3 이미지] 사각형 이미지 업로드 완료: {square_url}")
+                
+                if size == 220:
+                    resized_urls['image_square'] = square_url
+                elif size == 360:
+                    resized_urls['image_large_square'] = square_url
         
+        logger.info(f"[S3 이미지] 모든 이미지 업로드 완료: {list(resized_urls.keys())}")
         return resized_urls
         
     except requests.RequestException as e:
