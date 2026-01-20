@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - main
+      - develop
 
 jobs:
   detect-pr:
+    # main 브랜치에서만 PR detection 실행
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       pr_number: ${{ steps.pr.outputs.pr_number }}
