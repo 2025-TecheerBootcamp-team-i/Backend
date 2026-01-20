@@ -55,10 +55,8 @@ class UserStatisticsService:
             prev_month_end = None
         
         # 현재 기간 쿼리
-        query = PlayLogs.objects.filter(
-            user_id=user_id,
-            is_deleted=False
-        ).select_related('music')
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        query = PlayLogs.objects.filter(user_id=user_id).select_related('music')
         
         if start_date:
             query = query.filter(played_at__gte=start_date)
@@ -79,9 +77,9 @@ class UserStatisticsService:
         change_percent = 0.0
         
         if period == 'month' and prev_month_start and prev_month_end:
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
             prev_query = PlayLogs.objects.filter(
                 user_id=user_id,
-                is_deleted=False,
                 played_at__gte=prev_month_start,
                 played_at__lt=start_date
             )
@@ -128,9 +126,9 @@ class UserStatisticsService:
         """
         now = timezone.now()
         
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         query = PlayLogs.objects.filter(
             user_id=user_id,
-            is_deleted=False,
             music__genre__isnull=False
         ).exclude(music__genre='')
         
@@ -188,9 +186,9 @@ class UserStatisticsService:
         """
         now = timezone.now()
         
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         query = PlayLogs.objects.filter(
             user_id=user_id,
-            is_deleted=False,
             music__artist__isnull=False
         )
         
@@ -251,10 +249,8 @@ class UserStatisticsService:
         now = timezone.now()
         
         # PlayLogs에서 사용자가 들은 music_id 목록 추출
-        play_query = PlayLogs.objects.filter(
-            user_id=user_id,
-            is_deleted=False
-        )
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        play_query = PlayLogs.objects.filter(user_id=user_id)
         
         if period == 'month':
             start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -264,9 +260,9 @@ class UserStatisticsService:
         played_music_ids = play_query.values_list('music_id', flat=True)
         
         # 해당 음악들의 태그 집계
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         tag_stats = MusicTags.objects.filter(
-            music_id__in=played_music_ids,
-            is_deleted=False
+            music_id__in=played_music_ids
         ).values(
             'tag__tag_id',
             'tag__tag_key'
@@ -307,10 +303,10 @@ class UserStatisticsService:
         now = timezone.now()
         
         # AI 생성 음악은 Music 테이블에서 is_ai=True, user_id로 필터
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         query = Music.objects.filter(
             user_id=user_id,
-            is_ai=True,
-            is_deleted=False
+            is_ai=True
         )
         
         if period == 'month':
@@ -333,6 +329,84 @@ class UserStatisticsService:
             'last_generated_at': last_generated_at,
             'last_generated_days_ago': last_generated_days_ago
         }
+
+    @classmethod
+    def get_top_tracks(
+        cls,
+        user_id: int,
+        period: str = 'month',
+        limit: int = 15
+    ) -> List[Dict[str, Any]]:
+        """
+        사용자가 가장 많이 들은 음악을 반환합니다.
+        
+        Args:
+            user_id: 사용자 ID
+            period: 기간 ('month' = 이번 달, 'all' = 전체)
+            limit: 반환할 음악 수 (기본값: 15)
+        
+        Returns:
+            [
+                {
+                    'rank': int,
+                    'music_id': int,
+                    'music_name': str,
+                    'artist_id': int,
+                    'artist_name': str,
+                    'album_id': int,
+                    'album_name': str,
+                    'album_image': str,
+                    'play_count': int,
+                    'percentage': float
+                },
+                ...
+            ]
+        """
+        now = timezone.now()
+        
+        query = PlayLogs.objects.filter(
+            user_id=user_id,
+            is_deleted=False,
+            music__is_deleted=False
+        )
+        
+        if period == 'month':
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            query = query.filter(played_at__gte=start_date)
+        
+        # 음악별 재생 횟수 집계
+        track_stats = query.values(
+            'music__music_id',
+            'music__music_name',
+            'music__artist__artist_id',
+            'music__artist__artist_name',
+            'music__album__album_id',
+            'music__album__album_name',
+            'music__album__album_image'
+        ).annotate(
+            play_count=Count('play_log_id')
+        ).order_by('-play_count')[:limit]
+        
+        # 전체 재생 횟수
+        total_plays = query.count()
+        
+        result = []
+        for idx, stat in enumerate(track_stats, 1):
+            percentage = round((stat['play_count'] / total_plays * 100), 1) if total_plays > 0 else 0
+            result.append({
+                'rank': idx,
+                'music_id': stat['music__music_id'],
+                'music_name': stat['music__music_name'],
+                'artist_id': stat.get('music__artist__artist_id'),
+                'artist_name': stat.get('music__artist__artist_name'),
+                'album_id': stat.get('music__album__album_id'),
+                'album_name': stat.get('music__album__album_name'),
+                'album_image': stat.get('music__album__album_image'),
+                'play_count': stat['play_count'],
+                'percentage': percentage
+            })
+        
+        return result
 
     @classmethod
     def get_full_statistics(

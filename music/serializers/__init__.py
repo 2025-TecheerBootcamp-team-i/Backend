@@ -42,6 +42,7 @@ from .statistics import (
     GenreStatSerializer,
     ArtistStatSerializer,
     TagStatSerializer,
+    TrackStatSerializer,
     AIGenerationStatSerializer,
     UserStatisticsSerializer,
 )
@@ -102,6 +103,7 @@ __all__ = [
     'GenreStatSerializer',
     'ArtistStatSerializer',
     'TagStatSerializer',
+    'TrackStatSerializer',
     'AIGenerationStatSerializer',
     'UserStatisticsSerializer',
     # playlist

@@ -132,44 +132,44 @@ class DatabaseQueryTestView(APIView):
         queries_executed = []
         
         # SELECT 쿼리들
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         if query_type in ['all', 'select']:
             # 1. Music 조회
-            music_list = list(Music.objects.filter(is_deleted=False)[:count])
+            music_list = list(Music.objects.all()[:count])
             queries_executed.append(f'Music SELECT: {len(music_list)}건')
             
             # 2. Artist 조회
-            artist_list = list(Artists.objects.filter(is_deleted=False)[:count])
+            artist_list = list(Artists.objects.all()[:count])
             queries_executed.append(f'Artists SELECT: {len(artist_list)}건')
             
             # 3. Album 조회
-            album_list = list(Albums.objects.filter(is_deleted=False)[:count])
+            album_list = list(Albums.objects.all()[:count])
             queries_executed.append(f'Albums SELECT: {len(album_list)}건')
             
             # 4. JOIN 쿼리 (select_related 사용)
             music_with_relations = list(
-                Music.objects.select_related('artist', 'album')
-                .filter(is_deleted=False)[:count]
+                Music.objects.select_related('artist', 'album')[:count]
             )
             queries_executed.append(f'Music JOIN (select_related): {len(music_with_relations)}건')
             
             # 5. 집계 쿼리
-            music_count = Music.objects.filter(is_deleted=False).count()
+            music_count = Music.objects.count()
             queries_executed.append(f'Music COUNT: {music_count}건')
             
             # 6. 조건부 쿼리
-            ai_music = list(Music.objects.filter(is_ai=True, is_deleted=False)[:count])
+            ai_music = list(Music.objects.filter(is_ai=True)[:count])
             queries_executed.append(f'Music WHERE (is_ai=True): {len(ai_music)}건')
             
             # 7. Tags 조회
-            tags_list = list(Tags.objects.filter(is_deleted=False)[:count])
+            tags_list = list(Tags.objects.all()[:count])
             queries_executed.append(f'Tags SELECT: {len(tags_list)}건')
             
             # 8. MusicTags 조회 (다대다 관계)
-            music_tags = list(MusicTags.objects.select_related('music', 'tag').filter(is_deleted=False)[:count])
+            music_tags = list(MusicTags.objects.select_related('music', 'tag')[:count])
             queries_executed.append(f'MusicTags JOIN: {len(music_tags)}건')
             
             # 9. PlayLogs 조회
-            play_logs = list(PlayLogs.objects.select_related('music', 'user').filter(is_deleted=False)[:count])
+            play_logs = list(PlayLogs.objects.select_related('music', 'user')[:count])
             queries_executed.append(f'PlayLogs JOIN: {len(play_logs)}건')
         
         # INSERT 쿼리 (테스트용 - 실제로는 저장하지 않음)

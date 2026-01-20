@@ -42,8 +42,8 @@ class PlaylistListCreateView(APIView):
         - visibility: public/private (선택)
         - user_id: 특정 사용자의 플레이리스트만 조회 (선택)
         """
-        # 기본 쿼리: 삭제되지 않은 플레이리스트
-        queryset = Playlists.objects.filter(is_deleted=False)
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        queryset = Playlists.objects.all()
         
         # 공개 범위 필터링
         visibility = request.query_params.get('visibility')
@@ -80,7 +80,8 @@ class PlaylistListCreateView(APIView):
         serializer = PlaylistCreateSerializer(data=request.data)
         
         if serializer.is_valid():
-            playlist = serializer.save(user=request.user, is_deleted=False)
+            # TrackableMixin이 자동으로 is_deleted=False, created_at, updated_at 설정
+            playlist = serializer.save(user=request.user)
             
             # 생성된 플레이리스트 상세 정보 반환
             detail_serializer = PlaylistDetailSerializer(playlist, context={'request': request})
@@ -105,7 +106,8 @@ class PlaylistDetailView(APIView):
         플레이리스트 상세 조회
         GET /api/v1/playlists/{playlistId}
         """
-        playlist = get_object_or_404(Playlists, playlist_id=playlist_id, is_deleted=False)
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        playlist = get_object_or_404(Playlists, playlist_id=playlist_id)
         
         # 권한 확인: 자신의 플레이리스트이거나 공개 플레이리스트만 조회 가능
         if playlist.visibility == 'private' and playlist.user != request.user:
@@ -128,7 +130,8 @@ class PlaylistDetailView(APIView):
             "visibility": "public" or "private" (선택)
         }
         """
-        playlist = get_object_or_404(Playlists, playlist_id=playlist_id, is_deleted=False)
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        playlist = get_object_or_404(Playlists, playlist_id=playlist_id)
         
         # 권한 확인: 자신의 플레이리스트만 수정 가능
         if playlist.user != request.user:
@@ -153,7 +156,8 @@ class PlaylistDetailView(APIView):
         플레이리스트 삭제
         DELETE /api/v1/playlists/{playlistId}
         """
-        playlist = get_object_or_404(Playlists, playlist_id=playlist_id, is_deleted=False)
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        playlist = get_object_or_404(Playlists, playlist_id=playlist_id)
         
         # 권한 확인: 자신의 플레이리스트만 삭제 가능
         if playlist.user != request.user:
@@ -162,9 +166,8 @@ class PlaylistDetailView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # 소프트 삭제
-        playlist.is_deleted = True
-        playlist.save()
+        # TrackableMixin의 delete() 메서드가 자동으로 Soft Delete 수행
+        playlist.delete()
         
         return Response(
             {'message': '플레이리스트가 삭제되었습니다.'},
@@ -192,7 +195,8 @@ class PlaylistItemAddView(APIView):
             "order": 1 (선택, 미지정 시 자동으로 마지막 순서)
         }
         """
-        playlist = get_object_or_404(Playlists, playlist_id=playlist_id, is_deleted=False)
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        playlist = get_object_or_404(Playlists, playlist_id=playlist_id)
         
         # 권한 확인: 자신의 플레이리스트에만 곡 추가 가능
         if playlist.user != request.user:
@@ -205,13 +209,14 @@ class PlaylistItemAddView(APIView):
         
         if serializer.is_valid():
             music_id = serializer.validated_data['music_id']
-            music = get_object_or_404(Music, music_id=music_id, is_deleted=False)
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+            music = get_object_or_404(Music, music_id=music_id)
             
             # 이미 추가된 곡인지 확인
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
             existing_item = PlaylistItems.objects.filter(
                 playlist=playlist,
-                music=music,
-                is_deleted=False
+                music=music
             ).first()
             
             if existing_item:
@@ -224,19 +229,18 @@ class PlaylistItemAddView(APIView):
             order = serializer.validated_data.get('order')
             if order is None:
                 # order 미지정 시 마지막 순서로 추가
+                # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
                 last_item = PlaylistItems.objects.filter(
-                    playlist=playlist,
-                    is_deleted=False
+                    playlist=playlist
                 ).order_by('-order').first()
                 
                 order = (last_item.order + 1) if last_item else 1
             
-            # 곡 추가
+            # 곡 추가 (TrackableMixin이 자동으로 필드 설정)
             item = PlaylistItems.objects.create(
                 playlist=playlist,
                 music=music,
-                order=order,
-                is_deleted=False
+                order=order
             )
             
             item_serializer = PlaylistItemSerializer(item)
@@ -265,7 +269,8 @@ class PlaylistItemDeleteView(APIView):
         플레이리스트에서 곡 삭제
         DELETE /api/v1/playlists/items/{itemsId}
         """
-        item = get_object_or_404(PlaylistItems, item_id=item_id, is_deleted=False)
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        item = get_object_or_404(PlaylistItems, item_id=item_id)
         
         # 권한 확인: 자신의 플레이리스트에서만 곡 삭제 가능
         if item.playlist.user != request.user:
@@ -274,9 +279,8 @@ class PlaylistItemDeleteView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # 소프트 삭제
-        item.is_deleted = True
-        item.save()
+        # TrackableMixin의 delete() 메서드가 자동으로 Soft Delete 수행
+        item.delete()
         
         return Response(
             {'message': '플레이리스트에서 곡이 삭제되었습니다.'},
@@ -299,8 +303,8 @@ class PlaylistLikeView(APIView):
         플레이리스트 좋아요 등록
         POST /api/v1/playlists/{playlistId}/likes
         """
-        # 플레이리스트 존재 확인
-        playlist = get_object_or_404(Playlists, playlist_id=playlist_id, is_deleted=False)
+        # 플레이리스트 존재 확인 (SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회)
+        playlist = get_object_or_404(Playlists, playlist_id=playlist_id)
         
         # 공개 플레이리스트만 좋아요 가능 (선택적, 요구사항에 따라 변경 가능)
         if playlist.visibility == 'private' and playlist.user != request.user:
@@ -309,28 +313,26 @@ class PlaylistLikeView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # 이미 좋아요가 있는지 확인
-        like, created = PlaylistLikes.objects.get_or_create(
-            user=request.user,
-            playlist=playlist,
-            defaults={'is_deleted': False}
-        )
+        # 이미 좋아요가 있는지 확인 (삭제된 것도 포함)
+        like = PlaylistLikes.all_objects.filter(user=request.user, playlist=playlist).first()
         
-        if not created and like.is_deleted:
-            # 삭제된 좋아요를 복구
-            like.is_deleted = False
-            like.save()
-            created = True
-        elif not created:
-            # 이미 좋아요가 있음
-            return Response(
-                {
-                    'message': '이미 좋아요를 누른 플레이리스트입니다.',
-                    'playlist_id': playlist_id,
-                    'is_liked': True
-                },
-                status=status.HTTP_200_OK
-            )
+        if like:
+            if like.is_deleted:
+                # 삭제된 좋아요를 복구
+                like.restore()
+            else:
+                # 이미 활성화된 좋아요가 있음
+                return Response(
+                    {
+                        'message': '이미 좋아요를 누른 플레이리스트입니다.',
+                        'playlist_id': playlist_id,
+                        'is_liked': True
+                    },
+                    status=status.HTTP_200_OK
+                )
+        else:
+            # 새로운 좋아요 생성
+            like = PlaylistLikes.objects.create(user=request.user, playlist=playlist)
         
         serializer = PlaylistLikeSerializer({
             'message': '좋아요가 등록되었습니다.',
@@ -345,18 +347,14 @@ class PlaylistLikeView(APIView):
         플레이리스트 좋아요 취소
         DELETE /api/v1/playlists/{playlistId}/likes
         """
-        # 플레이리스트 존재 확인
-        playlist = get_object_or_404(Playlists, playlist_id=playlist_id, is_deleted=False)
+        # 플레이리스트 존재 확인 (SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회)
+        playlist = get_object_or_404(Playlists, playlist_id=playlist_id)
         
-        # 좋아요 찾기
+        # 좋아요 찾기 (SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회)
         try:
-            like = PlaylistLikes.objects.get(
-                user=request.user,
-                playlist=playlist,
-                is_deleted=False
-            )
-            like.is_deleted = True
-            like.save()
+            like = PlaylistLikes.objects.get(user=request.user, playlist=playlist)
+            # TrackableMixin의 delete() 메서드가 자동으로 Soft Delete 수행
+            like.delete()
             
             serializer = PlaylistLikeSerializer({
                 'message': '좋아요가 취소되었습니다.',
