@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 
-from music.services.user_statistics import UserStatisticsService
+from music.services.internal.user_statistics import UserStatisticsService
 from music.serializers.statistics import (
     UserStatisticsSerializer,
     ListeningTimeSerializer,
