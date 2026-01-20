@@ -24,7 +24,7 @@ from .auth import (
 from .likes import MusicLikeView
 
 # 검색 관련 Views
-from .search import MusicSearchView
+from .search import MusicSearchView, AiMusicSearchView
 
 # 음악 상세 관련 Views
 from .music import MusicDetailView, MusicPlayView
@@ -83,6 +83,7 @@ __all__ = [
     'MusicLikeView',
     # search
     'MusicSearchView',
+    'AiMusicSearchView',
     # music
     'MusicDetailView',
     'MusicPlayView',
