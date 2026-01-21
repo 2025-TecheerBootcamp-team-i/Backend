@@ -24,6 +24,14 @@ services:
       - traefik.http.routers.backend.entryPoints=websecure
       - traefik.http.routers.backend.rule=Host(`api.brokencarrot.my`)
       - traefik.http.routers.backend.tls.certResolver=letsencrypt
+
+      # ===== CORS 미들웨어 추가 =====
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=http://localhost:4173,http://localhost:5173,https://your-frontend-domain.com"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowheaders=Content-Type,Authorization,Accept,Accept-Encoding,X-Requested-With"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=86400"
+      - "traefik.http.routers.backend.middlewares=backend-cors@docker"
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
