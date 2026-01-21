@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     RegisterView,
     LoginView,
+    EmailCheckView,
     TokenRefreshView,
     MusicLikeView,
     MusicSearchView,
@@ -58,6 +59,7 @@ urlpatterns = [
     # 인증 관련
     path('auth/users/', RegisterView.as_view(), name='register'),
     path('auth/tokens/', LoginView.as_view(), name='login'),
+    path('auth/check-email/', EmailCheckView.as_view(), name='email_check'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # 테스트용 엔드포인트

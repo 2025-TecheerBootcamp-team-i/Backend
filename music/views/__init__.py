@@ -18,6 +18,7 @@ from .auth import (
     RegisterView,
     LoginView,
     TokenRefreshView,
+    EmailCheckView,
 )
 
 # 좋아요 관련 Views
@@ -80,6 +81,7 @@ __all__ = [
     'RegisterView',
     'LoginView',
     'TokenRefreshView',
+    'EmailCheckView',
     # likes
     'MusicLikeView',
     # search
