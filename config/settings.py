@@ -154,8 +154,8 @@ CELERY_RESULT_BACKEND = 'django-db' # Celery 작업 결과를 Django DB에 저�
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'Asia/Seoul'
-CELERY_ENABLE_UTC = False
+CELERY_TIMEZONE = 'UTC'  # UTC 시간대 사용 (시간대 혼동 방지)
+CELERY_ENABLE_UTC = True  # UTC 시간 사용
 
 # ==============================================
 # Celery Beat 스케줄 설정 (주기적 작업)
@@ -166,19 +166,19 @@ CELERY_BEAT_SCHEDULE = {
     # 실시간 차트: 10분마다 갱신 (최근 3시간 집계)
     'update-realtime-chart': {
         'task': 'music.tasks.update_realtime_chart',
-        'schedule': crontab(minute='*/10'),  # 매 10분마다
+        'schedule': crontab(minute='*/10', timezone='UTC'),  # 매 10분마다 UTC
     },
-    
+
     # 일일 차트: 매일 자정에 갱신 (전날 전체 집계)
     'update-daily-chart': {
         'task': 'music.tasks.update_daily_chart',
-        'schedule': crontab(hour=0, minute=0),  # 매일 00:00
+        'schedule': crontab(hour=0, minute=0, timezone='UTC'),  # 매일 00:00 UTC
     },
     
     # AI 차트: 매일 자정에 갱신 (전날 AI 곡만 집계)
     'update-ai-chart': {
         'task': 'music.tasks.update_ai_chart',
-        'schedule': crontab(hour=0, minute=5),  # 매일 00:05 (일일 차트와 약간 시차)
+        'schedule': crontab(hour=0, minute=5, timezone='UTC'),  # 매일 00:05 UTC (일일 차트와 약간 시차)
     },
     
     # 재생 기록 정리: 매일 새벽 2시 (90일 이전 삭제)
