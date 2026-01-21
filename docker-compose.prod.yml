@@ -1,10 +1,12 @@
+version: '3.8'
+
 services:
-  # Django 백엔드 애플리케이션 (프로덕션용 이미지)
+  # 1. Django 백엔드 (메모리 제한 추가)
   backend:
     image: hhyuninu/2025_techeer_team_i:latest
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
     env_file:
-      - .env.production  # 프로덕션 환경 변수 파일 (서버에 업로드 필요)
+      - .env.production
     ports:
       - "8000:8000"
     depends_on:
@@ -18,45 +20,62 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 600M  # 2GB 서버 보호용 제한
 
-  # RabbitMQ 메시지 브로커 (Celery용)
+  # 2. RabbitMQ (메모리 제한 추가)
   rabbitmq:
     image: rabbitmq:3-management
     ports:
-      - "15672:15672"  # 관리 UI (선택사항)
+      - "15672:15672"
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 300M
 
-  # Celery 워커 (비동기 작업 처리)
+  # 3. Celery 워커 (동시성 제어 및 메모리 제한)
   celery:
     image: hhyuninu/2025_techeer_team_i:latest
-    command: celery -A config worker -l info
+    command: celery -A config worker -l info --concurrency=1
     env_file:
-      - .env.production  # 프로덕션 환경 변수 파일 (서버에 업로드 필요)
+      - .env.production
     depends_on:
       - rabbitmq
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
-  # Celery Beat (주기적 작업 스케줄러)
+    deploy:
+      resources:
+        limits:
+          memory: 350M
+
+  # 4. Celery Beat
   celery-beat:
     image: hhyuninu/2025_techeer_team_i:latest
     command: celery -A config beat -l info
     env_file:
-      - .env.production  # 프로덕션 환경 변수 파일 (서버에 업로드 필요)
+      - .env.production
     depends_on:
       - rabbitmq
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 200M
 
-  # Flower (Celery 모니터링)
+  # 5. Flower
   flower:
     image: hhyuninu/2025_techeer_team_i:latest
     command: celery -A config flower --port=5555
     env_file:
-      - .env.production  # 프로덕션 환경 변수 파일 (서버에 업로드 필요)
+      - .env.production
     ports:
       - "5555:5555"
     depends_on:
@@ -65,7 +84,12 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
-# Ngrok 터널 서비스 (웹훅 콜백용)
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+
+  # 6. Ngrok
   ngrok:
     image: ngrok/ngrok:latest
     command:
@@ -73,7 +97,7 @@ services:
       - backend:8000
       - --log=stdout
     ports:
-      - "4040:4040"  # ngrok 웹 UI 포트
+      - "4040:4040"
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
     depends_on:
@@ -81,75 +105,43 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
-  # ===== 모니터링 스택 =====
 
-  # Prometheus - 메트릭 수집 및 저장
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.enable-lifecycle'
-    networks:
-      - ubuntu_gitops-network
-    restart: unless-stopped
+  # ===== 모니터링 스택 (Cloud 전송용 - 가벼움) =====
 
-  # Grafana - 시각화 대시보드
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
-      - GF_USERS_ALLOW_SIGN_UP=false
-    depends_on:
-      - prometheus
-      - loki
-    networks:
-      - ubuntu_gitops-network
-    restart: unless-stopped
-
-  # Loki - 로그 수집 및 저장
-  loki:
-    image: grafana/loki:latest
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./monitoring/loki.yml:/etc/loki/local-config.yaml:ro
-      - loki_data:/loki
-    command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - ubuntu_gitops-network
-    restart: unless-stopped
-
-  # Promtail - 로그 수집 에이전트
+  # 7. Promtail (로그 전송)
   promtail:
     image: grafana/promtail:latest
     volumes:
-      - ./monitoring/promtail.yml:/etc/promtail/config.yml:ro
+      # 설정 파일 경로는 그대로 유지 (아래 2번에서 만들 파일)
+      - ./monitoring/promtail-cloud.yml:/etc/promtail/config.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: -config.file=/etc/promtail/config.yml
-    depends_on:
-      - loki
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 150M
 
-volumes:
-  prometheus_data:
-  grafana_data:
-  loki_data:
+  # 8. Grafana Agent (메트릭 전송 - Prometheus 대체)
+  grafana-agent:
+    image: grafana/agent:latest
+    volumes:
+      # 설정 파일 경로는 그대로 유지 (아래 3번에서 만들 파일)
+      - ./monitoring/agent-cloud.yml:/etc/agent/agent.yaml:ro
+    command: [
+      "-config.file=/etc/agent/agent.yaml",
+      "-metrics.wal-directory=/tmp/agent/wal"
+    ]
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 200M
 
 networks:
   ubuntu_gitops-network:

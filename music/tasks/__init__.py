@@ -40,6 +40,11 @@ from .cleanup import (
     cleanup_old_realtime_charts,
 )
 
+# 이미지 리사이징 작업
+from .image_resize import (
+    resize_image_task,
+)
+
 __all__ = [
     # 공통
     'test_task',
@@ -61,4 +66,6 @@ __all__ = [
     # 정리
     'cleanup_old_playlogs',
     'cleanup_old_realtime_charts',
+    # 이미지 리사이징
+    'resize_image_task',
 ]
