@@ -18,15 +18,11 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         fields = ['email', 'password', 'password_confirm', 'nickname']
 
     def validate_email(self, value):
-        """이메일 형식 및 중복 검증"""
+        """이메일 형식 검증"""
         # 이메일 형식 검증 (정규식)
         email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
         if not re.match(email_regex, value):
             raise serializers.ValidationError("이메일 형식이 올바르지 않습니다")
-
-        # 중복 확인
-        if Users.objects.filter(email=value).exists():
-            raise serializers.ValidationError("이미 사용중인 이메일입니다")
 
         return value
 
