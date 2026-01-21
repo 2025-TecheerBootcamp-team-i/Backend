@@ -46,6 +46,7 @@ from .views.ai_music import (
     MusicDetailView as AiMusicDetailView,
     SunoTaskStatusView,
     SunoWebhookView,
+    ConvertPromptView,
 )
 
 app_name = 'music'
@@ -141,6 +142,10 @@ urlpatterns = [
     # ========================
     # AI 음악 생성 API (리팩토링된 CBV)
     # ========================
+    # 프롬프트 변환
+    # POST /api/v1/music/convert-prompt/
+    path('convert-prompt/', ConvertPromptView.as_view(), name='convert_prompt'),
+    
     # 음악 생성 (동기) - 완료까지 대기
     # POST /api/v1/music/generate/
     path('generate/', AiMusicGenerateView.as_view(), name='ai_music_generate'),

@@ -21,10 +21,12 @@ from ..serializers.ai_music import (
     MusicGenerateSimpleResponseSerializer,
     TaskStatusSerializer,
     MusicListSerializer,
-    SunoTaskStatusResponseSerializer
+    SunoTaskStatusResponseSerializer,
+    ConvertPromptRequestSerializer,
+    ConvertPromptResponseSerializer
 )
 from ..services import AiMusicGenerationService
-from ..music_generate.services import SunoAPIService
+from ..music_generate.services import SunoAPIService, LlamaService
 from ..music_generate.exceptions import (
     SunoCreditInsufficientError,
     SunoAuthenticationError,
@@ -298,8 +300,7 @@ class MusicListView(APIView):
         ],
         responses={
             200: MusicListSerializer(many=True)
-        },
-        tags=['음악']
+        }
     )
     def get(self, request):
         """음악 목록 조회 (필터링 및 정렬)"""
@@ -348,8 +349,7 @@ class MusicDetailView(APIView):
         responses={
             200: MusicGenerateResponseSerializer,
             404: OpenApiTypes.OBJECT
-        },
-        tags=['음악']
+        }
     )
     def get(self, request, music_id):
         """음악 상세 정보 조회"""
@@ -510,4 +510,106 @@ class SunoWebhookView(APIView):
                     "error": str(e)
                 },
                 status=status.HTTP_200_OK
+            )
+
+
+class ConvertPromptView(APIView):
+    """
+    프롬프트 변환 API
+    
+    POST /api/v1/music/convert-prompt/
+    
+    사용자가 입력한 한국어 프롬프트를 Llama를 통해 영어 음악 프롬프트로 변환합니다.
+    """
+    permission_classes = [AllowAny]
+    parser_classes = [FlexibleJSONParser]
+    
+    @extend_schema(
+        summary="프롬프트 변환",
+        description="한국어 프롬프트를 Llama를 통해 영어 음악 프롬프트로 변환",
+        request=ConvertPromptRequestSerializer,
+        responses={
+            200: ConvertPromptResponseSerializer,
+            400: OpenApiTypes.OBJECT,
+            500: OpenApiTypes.OBJECT
+        },
+        tags=['프롬프트 변환']
+    )
+    def post(self, request):
+        """
+        프롬프트 변환 요청 처리
+        
+        요청 예시:
+        {
+            "prompt": "놀이동산",
+            "make_instrumental": false
+        }
+        
+        응답 예시:
+        {
+            "converted_prompt": "amusement park, fun upbeat Pop, 100 BPM, synthesizer drums bass, energetic Korean lyrics and Korean male vocals"
+        }
+        """
+        # 1. 요청 데이터 검증
+        serializer = ConvertPromptRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "error": "입력 데이터가 유효하지 않습니다.",
+                    "details": serializer.errors
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        validated_data = serializer.validated_data
+        user_prompt = validated_data['prompt']
+        make_instrumental = validated_data.get('make_instrumental', False)
+        
+        try:
+            # 2. LlamaService를 통해 프롬프트 변환
+            llama_service = LlamaService()
+            music_params = llama_service.generate_music_params(user_prompt)
+            
+            if not music_params:
+                return Response(
+                    {
+                        "error": "프롬프트 변환에 실패했습니다. Llama 서버 연결을 확인하세요."
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # 3. 변환된 프롬프트 추출
+            converted_prompt = music_params.get('prompt', '')
+            
+            # make_instrumental이 true인 경우, 보컬 관련 텍스트 제거 또는 수정
+            if make_instrumental:
+                # "Korean lyrics", "Korean vocals" 등의 텍스트 제거
+                converted_prompt = converted_prompt.replace('Korean lyrics', '').replace('Korean male vocals', '').replace('Korean female vocals', '')
+                converted_prompt = converted_prompt.replace('lyrics', '').replace('vocals', '')
+                # 연속된 쉼표와 공백 정리
+                converted_prompt = ', '.join([part.strip() for part in converted_prompt.split(',') if part.strip()])
+                # "instrumental" 추가
+                if 'instrumental' not in converted_prompt.lower():
+                    converted_prompt = f"{converted_prompt}, instrumental"
+            
+            # 4. 응답 생성
+            response_serializer = ConvertPromptResponseSerializer({
+                'converted_prompt': converted_prompt
+            })
+            
+            return Response(
+                response_serializer.data,
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            print(f"[Convert Prompt] 프롬프트 변환 오류: {e}")
+            traceback.print_exc()
+            
+            return Response(
+                {
+                    "error": "프롬프트 변환 중 오류가 발생했습니다.",
+                    "message": str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
