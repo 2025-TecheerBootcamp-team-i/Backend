@@ -75,6 +75,7 @@ from .ai_music import (
     MusicGenerateSimpleResponseSerializer,
     TaskStatusSerializer,
     MusicListSerializer as AiMusicListSerializer,
+    UserAiMusicListSerializer,
     SunoTaskStatusRequestSerializer,
     SunoTaskStatusResponseSerializer,
 )
@@ -128,6 +129,7 @@ __all__ = [
     'MusicGenerateSimpleResponseSerializer',
     'TaskStatusSerializer',
     'AiMusicListSerializer',
+    'UserAiMusicListSerializer',
     'SunoTaskStatusRequestSerializer',
     'SunoTaskStatusResponseSerializer',
 ]

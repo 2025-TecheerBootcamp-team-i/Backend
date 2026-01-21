@@ -21,6 +21,7 @@ from ..serializers.ai_music import (
     MusicGenerateSimpleResponseSerializer,
     TaskStatusSerializer,
     MusicListSerializer,
+    UserAiMusicListSerializer,
     SunoTaskStatusResponseSerializer,
     ConvertPromptRequestSerializer,
     ConvertPromptResponseSerializer
@@ -185,7 +186,7 @@ class AiMusicGenerateAsyncView(APIView):
             202: TaskStatusSerializer,
             400: OpenApiTypes.OBJECT
         },
-        tags=['AI 음악 생성']
+        tags=['AI 음악 조회']
     )
     def post(self, request):
         """
@@ -322,6 +323,39 @@ class MusicListView(APIView):
         queryset = queryset.select_related('artist', 'album').order_by('-created_at')
         
         serializer = MusicListSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UserAiMusicListView(APIView):
+    """
+    특정 사용자가 생성한 AI 음악 목록 조회 API
+    
+    GET /api/v1/users/{user_id}/ai-music/
+    """
+    permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="사용자 AI 음악 목록 조회",
+        description="user_id와 is_ai를 기준으로 사용자가 생성한 AI 음악 목록을 반환합니다.",
+        parameters=[
+            OpenApiParameter(
+                name='user_id',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description='사용자 ID'
+            )
+        ],
+        responses={200: UserAiMusicListSerializer(many=True)},
+        tags=['AI 음악 목록 조회']
+    )
+    def get(self, request, user_id):
+        """사용자가 생성한 AI 음악 목록 조회"""
+        queryset = (
+            Music.objects.select_related('album')
+            .filter(user_id=user_id, is_ai=True)
+            .order_by('-created_at')
+        )
+        serializer = UserAiMusicListSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

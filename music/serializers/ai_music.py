@@ -6,7 +6,7 @@ AI 음악 생성 Serializers
 """
 from rest_framework import serializers
 from ..models import Music, AiInfo, Artists, Albums
-from .base import ArtistSerializer, AlbumSerializer, AiInfoSerializer
+from .base import ArtistSerializer, AlbumSerializer, AiInfoSerializer, TagSerializer
 
 
 class MusicGenerateRequestSerializer(serializers.Serializer):
@@ -230,6 +230,55 @@ class MusicListSerializer(serializers.ModelSerializer):
             return obj.album.image_square
         
         return obj.album.album_image
+
+
+class UserAiMusicListSerializer(serializers.ModelSerializer):
+    """
+    특정 사용자가 생성한 AI 음악 목록 응답용 Serializer
+    """
+    album_image_square = serializers.SerializerMethodField()
+    like_count = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Music
+        fields = [
+            'music_id',
+            'music_name',
+            'audio_url',
+            'lyrics',
+            'album_image_square',
+            'like_count',
+            'tags',
+        ]
+    
+    def get_album_image_square(self, obj):
+        """
+        사각형 앨범 이미지 URL 반환 (없으면 기본 앨범 이미지로 폴백)
+        """
+        if not obj.album:
+            return None
+        
+        if obj.album.image_square:
+            return obj.album.image_square
+        
+        return obj.album.album_image
+
+    def get_like_count(self, obj):
+        """해당 음악의 좋아요 개수"""
+        from ..models import MusicLikes
+        return MusicLikes.objects.filter(music=obj, is_deleted__in=[False, None]).count()
+    
+    def get_tags(self, obj):
+        """해당 음악에 연결된 태그 목록"""
+        from ..models import MusicTags
+        music_tags = MusicTags.objects.filter(
+            music=obj,
+            is_deleted__in=[False, None]
+        ).select_related('tag')
+        
+        tags = [mt.tag for mt in music_tags if mt.tag and mt.tag.is_deleted in [False, None]]
+        return TagSerializer(tags, many=True).data
 
 
 class SunoTaskStatusRequestSerializer(serializers.Serializer):
