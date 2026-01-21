@@ -8,6 +8,7 @@ from django.utils import timezone
 from ..models import Music, Artists, Albums
 from ..utils.s3_upload import upload_image_to_s3, is_s3_url
 from ..services import WikidataService, LRCLIBService, DeezerService, LyricsOvhService
+from ..services.ytmusic import YTMusicService
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +19,14 @@ def fetch_artist_image_task(self, artist_id: int, artist_name: str):
     아티스트 이미지를 비동기로 조회하고 S3에 업로드 후 DB 업데이트
     
     API 호출 순서 (fallback 체인):
-    1. Wikidata API (1차)
-    2. Deezer API (2차 fallback)
+    1. YouTube Music API (1차)
+    2. Wikidata API (2차 fallback)
+    3. Deezer API (3차 fallback)
     
     이미지 처리:
     1. 외부 API에서 이미지 URL 조회
     2. S3에 업로드 (media/images/artists/original/)
-    3. Lambda가 자동으로 리사이징 (원형 228x228, 208x208 / 사각형 220x220)
+    3. Celery 태스크가 자동으로 리사이징 (원형 228x228, 208x208 / 사각형 220x220)
     4. DB에 S3 URL 저장
     
     Args:
@@ -55,12 +57,19 @@ def fetch_artist_image_task(self, artist_id: int, artist_name: str):
         image_url = None
         source = None
         
-        # 1차: Wikidata에서 이미지 조회
-        image_url = WikidataService.fetch_artist_image(artist_name)
+        # 1차: YouTube Music에서 이미지 조회
+        image_url = YTMusicService.fetch_artist_image(artist_name)
         if image_url:
-            source = "Wikidata"
+            source = "YouTube Music"
         
-        # 2차 fallback: Deezer에서 이미지 조회
+        # 2차 fallback: Wikidata에서 이미지 조회
+        if not image_url:
+            logger.info(f"[아티스트 이미지] YouTube Music 실패, Wikidata fallback 시도: {artist_name}")
+            image_url = WikidataService.fetch_artist_image(artist_name)
+            if image_url:
+                source = "Wikidata"
+        
+        # 3차 fallback: Deezer에서 이미지 조회
         if not image_url:
             logger.info(f"[아티스트 이미지] Wikidata 실패, Deezer fallback 시도: {artist_name}")
             image_url = DeezerService.fetch_artist_image(artist_name)
@@ -68,7 +77,7 @@ def fetch_artist_image_task(self, artist_id: int, artist_name: str):
                 source = "Deezer"
         
         if image_url:
-            # S3에 이미지 업로드 (Lambda가 자동으로 리사이징)
+            # S3에 이미지 업로드 (Celery 태스크가 리사이징)
             try:
                 resized_urls = upload_image_to_s3(
                     image_url=image_url,
@@ -115,26 +124,31 @@ def fetch_artist_image_task(self, artist_id: int, artist_name: str):
 
 
 @shared_task(bind=True, max_retries=2)
-def fetch_album_image_task(self, album_id: int, album_name: str, album_image_url: str):
+def fetch_album_image_task(self, album_id: int, album_name: str, album_image_url: str = None, artist_name: str = None):
     """
     앨범 이미지를 S3에 업로드하고 리사이징된 URL을 DB에 저장
     
+    API 호출 순서 (fallback 체인):
+    1. YouTube Music API (1차)
+    2. iTunes API (2차 fallback, album_image_url 사용)
+    
     이미지 처리:
-    1. 외부 URL에서 이미지 다운로드
+    1. 외부 API에서 이미지 URL 조회
     2. S3에 업로드 (media/images/albums/original/)
-    3. Lambda가 자동으로 리사이징 (사각형 220x220)
+    3. Celery 태스크가 리사이징 (사각형 220x220, 360x360)
     4. DB에 원본 + 리사이징된 URL 저장
     
     Args:
         album_id: Album 모델의 ID
         album_name: 앨범 이름
-        album_image_url: 앨범 이미지 URL
+        album_image_url: 앨범 이미지 URL (iTunes fallback용, 선택사항)
+        artist_name: 아티스트 이름 (YouTube Music 검색 정확도 향상용, 선택사항)
         
     Returns:
         S3 이미지 URL 또는 None
     """
     try:
-        logger.info(f"[앨범 이미지] 업로드 시작: album_id={album_id}, name={album_name}")
+        logger.info(f"[앨범 이미지] 조회 시작: album_id={album_id}, name={album_name}")
         
         # Album 객체 조회
         try:
@@ -151,38 +165,58 @@ def fetch_album_image_task(self, album_id: int, album_name: str, album_image_url
             # S3 URL이 아니면 새로 업로드 진행
             logger.info(f"[앨범 이미지] 기존 URL이 S3가 아님, S3로 업로드 진행: album_id={album_id}")
         
-        if not album_image_url:
-            logger.info(f"[앨범 이미지] 이미지 URL이 없음: album_id={album_id}")
+        image_url = None
+        source = None
+        
+        # artist_name이 없으면 앨범의 아티스트 정보 사용
+        if not artist_name and album.artist:
+            artist_name = album.artist.artist_name
+        
+        # 1차: YouTube Music에서 이미지 조회
+        image_url = YTMusicService.fetch_album_image(album_name, artist_name)
+        if image_url:
+            source = "YouTube Music"
+        
+        # 2차 fallback: iTunes에서 받은 album_image_url 사용
+        if not image_url and album_image_url:
+            logger.info(f"[앨범 이미지] YouTube Music 실패, iTunes fallback 시도: {album_id}")
+            image_url = album_image_url
+            source = "iTunes"
+        
+        if not image_url:
+            logger.info(f"[앨범 이미지] 모든 소스에서 이미지를 찾지 못함: album_id={album_id}")
             return None
         
-        # S3에 이미지 업로드 (Lambda가 자동으로 리사이징)
+        # S3에 이미지 업로드 (Celery 태스크가 리사이징)
         try:
             resized_urls = upload_image_to_s3(
-                image_url=album_image_url,
+                image_url=image_url,
                 image_type='albums',
                 entity_id=album_id,
                 entity_name=album_name
             )
-            logger.info(f"[앨범 이미지] S3 업로드 완료: album_id={album_id}")
+            logger.info(f"[앨범 이미지] S3 업로드 완료 ({source}): album_id={album_id}")
             
             # DB 업데이트 (원본 + 리사이징된 이미지 URL 저장)
             album.album_image = resized_urls.get('original')
             album.image_square = resized_urls.get('image_square')  # 220x220
+            album.image_large_square = resized_urls.get('image_large_square')  # 360x360
             album.updated_at = timezone.now()
             album.save()
             logger.info(f"[앨범 이미지] DB 저장 완료: album_id={album_id}")
             logger.info(f"  - 원본: {resized_urls.get('original', '')[:60]}...")
-            logger.info(f"  - 사각형: {resized_urls.get('image_square', '')[:60]}...")
+            logger.info(f"  - 사각형 220x220: {resized_urls.get('image_square', '')[:60]}...")
+            logger.info(f"  - 사각형 360x360: {resized_urls.get('image_large_square', '')[:60]}...")
             return resized_urls.get('original')
             
         except Exception as upload_error:
             # S3 업로드 실패 시 원본 URL이라도 저장
             logger.warning(f"[앨범 이미지] S3 업로드 실패, 원본 URL 저장: {upload_error}")
-            album.album_image = album_image_url
+            album.album_image = image_url
             album.updated_at = timezone.now()
             album.save()
-            logger.info(f"[앨범 이미지] 원본 URL 저장 완료: album_id={album_id}")
-            return album_image_url
+            logger.info(f"[앨범 이미지] 원본 URL 저장 완료 ({source}): album_id={album_id}")
+            return image_url
             
     except Exception as e:
         logger.error(f"[앨범 이미지] 실패: album_id={album_id}, 오류: {e}")
