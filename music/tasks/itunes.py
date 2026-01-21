@@ -118,7 +118,13 @@ def save_itunes_track_to_db_task(self, itunes_data: dict):
                     try:
                         # 순환 참조 방지를 위해 지연 import
                         from .metadata import fetch_album_image_task
-                        fetch_album_image_task.delay(album.album_id, album_name, album_image_url)
+                        # artist_name 전달하여 YouTube Music 검색 정확도 향상
+                        fetch_album_image_task.delay(
+                            album.album_id, 
+                            album_name, 
+                            album_image_url,  # iTunes fallback용
+                            artist_name  # YouTube Music 검색용
+                        )
                     except Exception as e:
                         logger.warning(f"[iTunes 저장] 앨범 이미지 태스크 호출 실패: {e}")
             

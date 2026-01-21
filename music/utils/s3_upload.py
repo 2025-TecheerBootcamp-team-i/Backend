@@ -274,7 +274,15 @@ def upload_image_to_s3(
         original_url = get_s3_url(s3_key)
         logger.info(f"[S3 이미지] 업로드 완료: {original_url}")
         
-        # 리사이징된 이미지 URL 생성 (Lambda가 생성할 경로)
+        # Celery 태스크로 이미지 리사이징 시작 (Lambda 대신)
+        try:
+            from music.tasks.image_resize import resize_image_task
+            resize_image_task.delay(s3_key, image_type, entity_id)
+            logger.info(f"[S3 이미지] 리사이징 태스크 시작: {s3_key}, entity_id={entity_id}")
+        except Exception as e:
+            logger.warning(f"[S3 이미지] 리사이징 태스크 시작 실패 (계속 진행): {e}")
+        
+        # 리사이징된 이미지 URL 생성 (예상 경로 - 실제 생성은 Celery 태스크에서)
         resized_urls = {}
         if image_type == 'artists':
             # 파일명에서 확장자 추출 및 변경
@@ -297,12 +305,14 @@ def upload_image_to_s3(
             # 파일명에서 확장자 추출 및 변경
             filename_without_ext = file_name.rsplit('.', 1)[0]
             
-            # 사각형 이미지 URL (JPEG)
-            square_key = f"media/images/albums/square/220x220/{filename_without_ext}.jpg"
+            # 사각형 이미지 URL (JPEG) - 220x220과 360x360
+            square_220_key = f"media/images/albums/square/220x220/{filename_without_ext}.jpg"
+            square_360_key = f"media/images/albums/square/360x360/{filename_without_ext}.jpg"
             
             resized_urls = {
                 'original': original_url,
-                'image_square': get_s3_url(square_key),
+                'image_square': get_s3_url(square_220_key),
+                'image_large_square': get_s3_url(square_360_key),
             }
         
         return resized_urls

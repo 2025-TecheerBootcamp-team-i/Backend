@@ -68,7 +68,13 @@ class MusicDetailView(APIView):
             album_image_url = itunes_data.get('album_image', '')
             if album_image_url and (album_created or not album.album_image):
                 try:
-                    fetch_album_image_task.delay(album.album_id, album_name, album_image_url)
+                    # artist_name 전달하여 YouTube Music 검색 정확도 향상
+                    fetch_album_image_task.delay(
+                        album.album_id, 
+                        album_name, 
+                        album_image_url,  # iTunes fallback용
+                        artist_name  # YouTube Music 검색용
+                    )
                 except Exception as e:
                     # 태스크 호출 실패해도 기본 저장은 완료되도록 함
                     import logging

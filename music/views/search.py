@@ -238,12 +238,15 @@ class MusicSearchView(APIView):
                             
                             # 앨범 이미지 비동기 수집 (새로 생성되었거나 이미지가 없는 경우)
                             album_image_url = item.get('album_image', '')
-                            if album_image_url and (album_created or not album.album_image):
+                            if album_created or not album.album_image:
                                 try:
+                                    # artist_name도 전달하여 YouTube Music 검색 정확도 향상
+                                    artist_name = item.get('artist_name', '')
                                     fetch_album_image_task.delay(
                                         album.album_id, 
                                         album_name, 
-                                        album_image_url
+                                        album_image_url,  # iTunes fallback용
+                                        artist_name  # YouTube Music 검색용
                                     )
                                 except Exception as e:
                                     # 태스크 호출 실패해도 기본 저장은 완료되도록 함
