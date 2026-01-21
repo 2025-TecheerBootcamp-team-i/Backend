@@ -8,28 +8,30 @@ metrics:
   configs:
     - name: default
       remote_write:
-        # ▼▼▼ 환경 변수로 API 토큰 관리 ▼▼▼
         - url: https://prometheus-prod-49-prod-ap-northeast-0.grafana.net/api/prom/push
           basic_auth:
             username: 2926985
             password: ${GRAFANA_CLOUD_TOKEN}
+          
+          # ▼▼▼ [필승 해결책] 전송 직전에 모든 데이터의 이름을 강제로 덮어씌웁니다.
+          write_relabel_configs:
+            - target_label: instance
+              replacement: 'backend-server'  # 무조건 이 이름으로 변경!
+              action: replace
+
       scrape_configs:
         - job_name: agent
           static_configs:
             - targets: ['localhost:12345']
 
-# ▼▼▼ [통합 모니터링 설정 추가] ▼▼▼
 integrations:
-  # 1. 서버 전체 하드웨어 감시 (CPU, RAM, Disk)
   node_exporter:
     enabled: true
+    # instance 설정을 지우고 위에서 일괄 처리합니다
     rootfs_path: /host/root
     sysfs_path: /host/sys
     procfs_path: /host/proc
 
-  # 2. 도커 컨테이너 개별 감시 (Celery, RabbitMQ 등)
   cadvisor:
     enabled: true
     docker_only: true
-    instance: localhost
-    docker_host: unix:///var/run/docker.sock
