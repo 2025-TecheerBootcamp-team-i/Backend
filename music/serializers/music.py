@@ -64,3 +64,50 @@ class MusicPlaySerializer(serializers.ModelSerializer):
             'album_image', 'audio_url', 'duration', 'genre', 
             'is_ai', 'lyrics', 'itunes_id'
         ]
+
+
+class UserLikedMusicSerializer(serializers.ModelSerializer):
+    """사용자가 좋아요한 곡 목록용 Serializer"""
+    artist_name = serializers.CharField(source='artist.artist_name', read_only=True, allow_null=True)
+    album_image = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Music
+        fields = [
+            'music_id', 'music_name', 'album_image', 
+            'artist_name', 'duration'
+        ]
+    
+    def get_album_image(self, obj):
+        """
+        앨범 이미지 URL 반환
+        
+        우선순위:
+        1. image_square (220x220 리사이징된 이미지)
+        2. album_image를 리사이징 URL로 변환
+        3. album_image (원본)
+        """
+        if not obj.album:
+            return None
+        
+        # RDS에서 image_square 필드 값을 직접 가져옴
+        if obj.album.image_square:
+            return obj.album.image_square
+        
+        # 원본 이미지를 리사이징 URL로 변환
+        if obj.album.album_image:
+            original_url = obj.album.album_image
+            
+            # media/images/albums/original/xxx.jpg -> media/images/albums/square/220x220/xxx.jpg
+            if '/original/' in original_url:
+                # 파일명 추출 및 확장자 변경
+                filename = original_url.split('/')[-1]
+                filename_without_ext = filename.rsplit('.', 1)[0]
+                square_filename = f"{filename_without_ext}.jpg"
+                
+                # 경로 변환
+                return original_url.replace('/original/', '/square/220x220/').replace(filename, square_filename)
+            
+            return original_url
+        
+        return None

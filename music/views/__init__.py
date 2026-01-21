@@ -22,7 +22,7 @@ from .auth import (
 )
 
 # 좋아요 관련 Views
-from .likes import MusicLikeView
+from .likes import MusicLikeView, UserLikedMusicListView
 
 # 검색 관련 Views
 from .search import MusicSearchView, AiMusicSearchView
@@ -85,6 +85,7 @@ __all__ = [
     'EmailCheckView',
     # likes
     'MusicLikeView',
+    'UserLikedMusicListView',
     # search
     'MusicSearchView',
     'AiMusicSearchView',

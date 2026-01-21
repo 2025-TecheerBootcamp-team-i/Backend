@@ -4,11 +4,11 @@
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
-from ..models import Music, MusicLikes
-from ..serializers import MusicLikeSerializer
+from ..models import Music, MusicLikes, Users
+from ..serializers import MusicLikeSerializer, UserLikedMusicSerializer
 
 
 class MusicLikeView(APIView):
@@ -100,3 +100,42 @@ class MusicLikeView(APIView):
                 },
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class UserLikedMusicListView(APIView):
+    """
+    사용자가 좋아요한 곡 목록 조회 API
+    
+    - GET: 사용자가 좋아요한 모든 곡 목록 조회
+    """
+    permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="사용자 좋아요 곡 목록 조회",
+        description="특정 사용자가 좋아요한 모든 곡 목록을 조회합니다.",
+        tags=['좋아요'],
+        responses={200: UserLikedMusicSerializer(many=True)}
+    )
+    def get(self, request, user_id):
+        """
+        사용자가 좋아요한 곡 목록 조회
+        GET /api/v1/tracks/{user_id}/likes
+        """
+        # 사용자 존재 확인
+        user = get_object_or_404(Users, user_id=user_id)
+        
+        # 해당 사용자가 좋아요한 곡들의 music_id 조회
+        liked_music_ids = MusicLikes.objects.filter(
+            user=user,
+            is_deleted=False
+        ).values_list('music_id', flat=True)
+        
+        # 좋아요한 곡들의 상세 정보 조회 (select_related로 최적화)
+        liked_musics = Music.objects.filter(
+            music_id__in=liked_music_ids,
+            is_deleted=False
+        ).select_related('artist', 'album').order_by('-created_at')
+        
+        serializer = UserLikedMusicSerializer(liked_musics, many=True)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
