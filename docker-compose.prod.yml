@@ -1,7 +1,14 @@
 version: '3.8'
 
+# [공통 로그 설정] 모든 컨테이너에 적용할 로그 삭제 규칙 (복사해서 씀)
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
-  # 1. Django 백엔드 (메모리 제한 추가)
+  # 1. Django 백엔드
   backend:
     image: hhyuninu/2025_techeer_team_i:latest
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
@@ -20,12 +27,13 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    logging: *default-logging  # <-- 로그 자동 삭제 적용
     deploy:
       resources:
         limits:
-          memory: 600M  # 2GB 서버 보호용 제한
+          memory: 600M
 
-  # 2. RabbitMQ (메모리 제한 추가)
+  # 2. RabbitMQ
   rabbitmq:
     image: rabbitmq:3-management
     ports:
@@ -33,12 +41,13 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    logging: *default-logging
     deploy:
       resources:
         limits:
           memory: 300M
 
-  # 3. Celery 워커 (동시성 제어 및 메모리 제한)
+  # 3. Celery 워커
   celery:
     image: hhyuninu/2025_techeer_team_i:latest
     command: celery -A config worker -l info --concurrency=1
@@ -49,6 +58,7 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -65,6 +75,7 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -84,6 +95,7 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -105,39 +117,51 @@ services:
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    logging: *default-logging
 
-  # ===== 모니터링 스택 (Cloud 전송용 - 가벼움) =====
+  # ===== 모니터링 스택 =====
 
   # 7. Promtail (로그 전송)
   promtail:
     image: grafana/promtail:latest
     volumes:
-      # 설정 파일 경로는 그대로 유지 (아래 2번에서 만들 파일)
       - ./monitoring/promtail-cloud.yml:/etc/promtail/config.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: -config.file=/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml -config.expand-env=true
+    env_file:
+      - .env.production
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    logging: *default-logging
     deploy:
       resources:
         limits:
           memory: 150M
 
-  # 8. Grafana Agent (메트릭 전송 - Prometheus 대체)
+  # 8. Grafana Agent (메트릭 전송 - 최종 업그레이드)
   grafana-agent:
     image: grafana/agent:latest
     volumes:
-      # 설정 파일 경로는 그대로 유지 (아래 3번에서 만들 파일)
       - ./monitoring/agent-cloud.yml:/etc/agent/agent.yaml:ro
+      # ▼▼▼ [필수] 서버 내부 정보 읽기 권한
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      # ▼▼▼ [필수] 도커 컨테이너 정보 읽기 권한
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command: [
       "-config.file=/etc/agent/agent.yaml",
+      "-config.expand-env",
       "-metrics.wal-directory=/tmp/agent/wal"
     ]
+    env_file:
+      - .env.production
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
+    logging: *default-logging
     deploy:
       resources:
         limits:

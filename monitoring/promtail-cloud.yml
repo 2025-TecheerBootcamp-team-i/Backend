@@ -1,0 +1,32 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  # ▼▼▼ 환경 변수로 API 토큰 관리 ▼▼▼
+  - url: https://logs-prod-030.grafana.net/loki/api/v1/push
+    tenant_id: 1459166            
+    basic_auth:
+      username: 1459166           
+      password: ${GRAFANA_CLOUD_TOKEN}    
+
+scrape_configs:
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          __path__: /var/log/*log
+
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
