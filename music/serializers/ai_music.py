@@ -250,3 +250,53 @@ class SunoTaskStatusResponseSerializer(serializers.Serializer):
     task_id = serializers.CharField(help_text="Suno API TaskID")
     status = serializers.CharField(help_text="작업 상태 (completed, pending, failed 등)")
     data = serializers.JSONField(allow_null=True, help_text="작업 데이터")
+
+
+class ConvertPromptRequestSerializer(serializers.Serializer):
+    """
+    프롬프트 변환 요청 직렬화
+    
+    사용 예시:
+    {
+        "prompt": "놀이동산",
+        "make_instrumental": false
+    }
+    """
+    prompt = serializers.CharField(
+        max_length=500,
+        required=True,
+        help_text="변환할 프롬프트 (예: '놀이동산')"
+    )
+    make_instrumental = serializers.BooleanField(
+        default=False,
+        required=False,
+        help_text="반주만 생성할지 여부 (기본: false)"
+    )
+    
+    def validate_prompt(self, value):
+        """프롬프트 유효성 검사"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("프롬프트는 비어있을 수 없습니다.")
+        
+        # 앞뒤 공백 제거
+        value = value.strip()
+        
+        # 최소 길이 체크
+        if len(value) < 2:
+            raise serializers.ValidationError("프롬프트는 최소 2자 이상이어야 합니다.")
+        
+        return value
+
+
+class ConvertPromptResponseSerializer(serializers.Serializer):
+    """
+    프롬프트 변환 응답 직렬화
+    
+    사용 예시:
+    {
+        "converted_prompt": "amusement park, fun upbeat Pop, 100 BPM, synthesizer drums bass, energetic Korean lyrics and Korean male vocals"
+    }
+    """
+    converted_prompt = serializers.CharField(
+        help_text="변환된 프롬프트 (영어)"
+    )

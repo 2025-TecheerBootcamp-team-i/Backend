@@ -1,5 +1,7 @@
 """
 외부 API 연동 서비스 패키지
+
+- iTunes, Wikidata, Deezer, LRCLIB, lyrics.ovh 등
 """
 
 from .itunes import iTunesService
@@ -12,6 +14,6 @@ __all__ = [
     'iTunesService',
     'WikidataService',
     'LRCLIBService',
-    'DeezerService',
-    'LyricsOvhService',
+    'DeezerService',       # Wikidata fallback (아티스트 이미지)
+    'LyricsOvhService',    # LRCLIB fallback (가사)
 ]
