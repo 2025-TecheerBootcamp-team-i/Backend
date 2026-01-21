@@ -67,6 +67,7 @@ from .ai_music import (
     MusicDetailView as AiMusicDetailView,
     SunoTaskStatusView,
     SunoWebhookView,
+    ConvertPromptView,
 )
 
 # 외부에서 사용 가능한 모든 클래스 및 함수
@@ -124,4 +125,5 @@ __all__ = [
     'AiMusicDetailView',
     'SunoTaskStatusView',
     'SunoWebhookView',
+    'ConvertPromptView',
 ]
