@@ -18,6 +18,7 @@ from .auth import (
     RegisterView,
     LoginView,
     TokenRefreshView,
+    EmailCheckView,
 )
 
 # 좋아요 관련 Views
@@ -65,6 +66,7 @@ from .ai_music import (
     CeleryTaskStatusView,
     MusicListView as AiMusicListView,
     MusicDetailView as AiMusicDetailView,
+    UserAiMusicListView,
     SunoTaskStatusView,
     SunoWebhookView,
     ConvertPromptView,
@@ -80,6 +82,7 @@ __all__ = [
     'RegisterView',
     'LoginView',
     'TokenRefreshView',
+    'EmailCheckView',
     # likes
     'MusicLikeView',
     # search
@@ -123,6 +126,7 @@ __all__ = [
     'CeleryTaskStatusView',
     'AiMusicListView',
     'AiMusicDetailView',
+    'UserAiMusicListView',
     'SunoTaskStatusView',
     'SunoWebhookView',
     'ConvertPromptView',

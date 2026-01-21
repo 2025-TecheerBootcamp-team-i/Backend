@@ -12,6 +12,7 @@ from django.contrib.auth.hashers import check_password
 from drf_spectacular.utils import extend_schema
 from ..models import Users
 from ..serializers import UserRegisterSerializer, UserLoginSerializer
+import re
 
 
 class RegisterView(APIView):
@@ -139,14 +140,84 @@ class LoginView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class EmailCheckView(APIView):
+    """
+    이메일 중복 검사 API
+    GET /api/v1/auth/check-email/?email=user@example.com
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="이메일 중복 검사",
+        description="""회원가입 전 이메일 중복 여부를 확인합니다.
+
+**검증 규칙:**
+- 이메일 형식 검증 (사용자명@도메인.최상위도메인)
+- 데이터베이스 중복 검사
+
+**응답:**
+- `available: true` - 사용 가능한 이메일
+- `available: false` - 중복된 이메일
+""",
+        parameters=[
+            {
+                'name': 'email',
+                'type': 'string',
+                'description': '중복 검사할 이메일 주소',
+                'required': True,
+                'example': 'user@example.com'
+            }
+        ],
+        responses={
+            200: {
+                'description': '검사 완료',
+                'content': {
+                    'application/json': {
+                        'examples': {
+                            'available': {
+                                'value': {'available': True}
+                            },
+                            'duplicate': {
+                                'value': {'available': False, 'message': '이미 사용중인 이메일입니다'}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        tags=['인증']
+    )
+
+    def get(self, request):
+        """이메일 중복 검사"""
+        email = request.query_params.get('email', '').strip()
+
+        # 이메일 파라미터 검증
+        if not email:
+            return Response(
+                {'available': False, 'message': '이메일은 필수 입력 항목입니다'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 중복 확인 (프론트엔드에서 형식 검증을 담당하므로 생략)
+        if Users.objects.filter(email=email).exists():
+            return Response(
+                {'available': False, 'message': '이미 사용중인 이메일입니다'},
+                status=status.HTTP_200_OK
+            )
+
+        # 사용 가능한 이메일
+        return Response({'available': True}, status=status.HTTP_200_OK)
+
+
 class TokenRefreshView(BaseTokenRefreshView):
     """
     JWT Refresh Token 갱신 API
-    
+
     POST /api/v1/auth/refresh/
     POST /api/music/auth/refresh/
     """
-    
+
     @extend_schema(
         summary="JWT 토큰 갱신",
         description="Refresh Token을 사용하여 새로운 Access Token 발급",

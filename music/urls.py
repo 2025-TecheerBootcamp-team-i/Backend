@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     RegisterView,
     LoginView,
+    EmailCheckView,
     TokenRefreshView,
     MusicLikeView,
     MusicSearchView,
@@ -29,6 +30,7 @@ from .views import (
     UserTopTagsView,
     UserTopTracksView,
     UserAIGenerationView,
+    UserAiMusicListView,
     # 플레이리스트
     PlaylistListCreateView,
     PlaylistDetailView,
@@ -58,6 +60,7 @@ urlpatterns = [
     # 인증 관련
     path('auth/users/', RegisterView.as_view(), name='register'),
     path('auth/tokens/', LoginView.as_view(), name='login'),
+    path('auth/check-email/', EmailCheckView.as_view(), name='email_check'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # 테스트용 엔드포인트
@@ -182,6 +185,10 @@ urlpatterns = [
     # ========================
     # 사용자 통계 API
     # ========================
+    # 사용자가 생성한 AI 음악 목록 조회
+    # GET /api/v1/users/{user_id}/ai-music/
+    path('users/<int:user_id>/ai-music/', UserAiMusicListView.as_view(), name='user-ai-music-list'),
+    
     # 전체 통계 조회
     # GET /api/v1/users/{user_id}/statistics/?period=month|all
     path('users/<int:user_id>/statistics/', UserStatisticsView.as_view(), name='user-statistics'),
