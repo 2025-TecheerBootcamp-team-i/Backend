@@ -75,6 +75,15 @@ class MusicGenerateResponseSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="앨범 이름"
     )
+    image_square = serializers.SerializerMethodField(
+        help_text="앨범 사각형 이미지 URL (220x220)"
+    )
+    image_large_square = serializers.SerializerMethodField(
+        help_text="앨범 큰 사각형 이미지 URL (360x360)"
+    )
+    album_image = serializers.SerializerMethodField(
+        help_text="앨범 원본 이미지 URL"
+    )
     ai_info = serializers.SerializerMethodField(
         help_text="AI 생성 정보 (프롬프트 등)"
     )
@@ -93,20 +102,50 @@ class MusicGenerateResponseSerializer(serializers.ModelSerializer):
             'arousal',
             'artist_name',
             'album_name',
+            'image_square',
+            'image_large_square',
+            'album_image',
             'ai_info',
             'created_at',
             'updated_at'
         ]
         read_only_fields = ['music_id', 'created_at', 'updated_at']
     
+    def get_image_square(self, obj):
+        """앨범 사각형 이미지 URL 반환 (220x220)"""
+        if not obj.album:
+            return None
+        return obj.album.image_square
+    
+    def get_image_large_square(self, obj):
+        """앨범 큰 사각형 이미지 URL 반환 (360x360)"""
+        if not obj.album:
+            return None
+        return obj.album.image_large_square
+    
+    def get_album_image(self, obj):
+        """앨범 원본 이미지 URL 반환"""
+        if not obj.album:
+            return None
+        return obj.album.album_image
+    
     def get_ai_info(self, obj):
         """AI 생성 정보 조회"""
         try:
             ai_info = AiInfo.objects.get(music=obj, is_deleted=False)
+            
+            # input_prompt에서 "Converted: " 부분만 추출
+            input_prompt = ai_info.input_prompt
+            if input_prompt and "Converted: " in input_prompt:
+                # "Converted: " 이후의 내용만 추출
+                converted_part = input_prompt.split("Converted: ", 1)
+                if len(converted_part) > 1:
+                    input_prompt = converted_part[1].strip()
+            
             return {
                 'aiinfo_id': ai_info.aiinfo_id,
                 'task_id': ai_info.task_id,
-                'input_prompt': ai_info.input_prompt,
+                'input_prompt': input_prompt,
                 'created_at': ai_info.created_at.isoformat() if ai_info.created_at else None
             }
         except AiInfo.DoesNotExist:
