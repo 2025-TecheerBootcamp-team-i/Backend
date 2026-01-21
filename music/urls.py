@@ -30,6 +30,7 @@ from .views import (
     UserTopTagsView,
     UserTopTracksView,
     UserAIGenerationView,
+    UserAiMusicListView,
     # 플레이리스트
     PlaylistListCreateView,
     PlaylistDetailView,
@@ -184,6 +185,10 @@ urlpatterns = [
     # ========================
     # 사용자 통계 API
     # ========================
+    # 사용자가 생성한 AI 음악 목록 조회
+    # GET /api/v1/users/{user_id}/ai-music/
+    path('users/<int:user_id>/ai-music/', UserAiMusicListView.as_view(), name='user-ai-music-list'),
+    
     # 전체 통계 조회
     # GET /api/v1/users/{user_id}/statistics/?period=month|all
     path('users/<int:user_id>/statistics/', UserStatisticsView.as_view(), name='user-statistics'),
