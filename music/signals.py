@@ -145,7 +145,7 @@ def artist_image_changed(sender, instance, created, update_fields, **kwargs):
 @receiver(post_save, sender=Users)
 def create_default_playlist(sender, instance, created, **kwargs):
     """
-    사용자가 회원가입하면 자동으로 "좋아요 표시한 음악" 플레이리스트를 생성
+    사용자가 회원가입하면 자동으로 "나의 좋아요 목록록" 플레이리스트를 생성
     
     - 회원가입 시에만 실행 (created=True)
     - 제목: "좋아요 표시한 음악"
@@ -170,7 +170,7 @@ def create_default_playlist(sender, instance, created, **kwargs):
             now = timezone.now()
             playlist = Playlists.objects.create(
                 user=user,
-                title="좋아요 표시한 음악",
+                title="나의 좋아요 목록",
                 visibility="private",
                 created_at=now,
                 updated_at=now,
