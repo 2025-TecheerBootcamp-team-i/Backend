@@ -388,25 +388,40 @@ class UserLikedAlbumsView(APIView):
         좋아요한 앨범 목록 조회
         GET /api/v1/albums/likes
         """
-        # 인증 확인 (테스트용: 인증 없으면 userId 1 사용)
-        if not request.user or not request.user.is_authenticated:
-            # 테스트용: userId 1 사용
-            user = get_object_or_404(Users, user_id=1)
-        else:
-            user = request.user
-        
-        # 해당 사용자가 좋아요한 앨범들의 album_id 조회
-        liked_album_ids = AlbumLikes.objects.filter(
-            user=user,
-            is_deleted=False
-        ).values_list('album_id', flat=True)
-        
-        # 좋아요한 앨범들의 상세 정보 조회 (select_related로 최적화)
-        liked_albums = Albums.objects.filter(
-            album_id__in=liked_album_ids,
-            is_deleted=False
-        ).select_related('artist').order_by('-created_at')
-        
-        serializer = UserLikedAlbumSerializer(liked_albums, many=True, context={'request': request})
-        
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        try:
+            # 인증 확인 (테스트용: 인증 없으면 userId 1 사용)
+            if not request.user or not request.user.is_authenticated:
+                # 테스트용: userId 1 사용
+                user = get_object_or_404(Users, user_id=1)
+            else:
+                user = request.user
+            
+            # 해당 사용자가 좋아요한 앨범들의 album_id 조회
+            liked_album_ids = AlbumLikes.objects.filter(
+                user=user,
+                is_deleted=False
+            ).values_list('album_id', flat=True)
+            
+            # 좋아요한 앨범들의 상세 정보 조회 (select_related로 최적화)
+            liked_albums = Albums.objects.filter(
+                album_id__in=liked_album_ids,
+                is_deleted=False
+            ).select_related('artist').order_by('-created_at')
+            
+            serializer = UserLikedAlbumSerializer(liked_albums, many=True, context={'request': request})
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            # 에러 로깅
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"좋아요한 앨범 조회 실패: {str(e)}", exc_info=True)
+            
+            return Response(
+                {
+                    'error': '좋아요한 앨범 조회 중 오류가 발생했습니다.',
+                    'detail': str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
