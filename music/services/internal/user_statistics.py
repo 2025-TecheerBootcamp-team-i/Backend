@@ -304,25 +304,43 @@ class UserStatisticsService:
         
         # AI 생성 음악은 Music 테이블에서 is_ai=True, user_id로 필터
         # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        # created_at이 None인 경우는 제외
         query = Music.objects.filter(
             user_id=user_id,
-            is_ai=True
+            is_ai=True,
+            created_at__isnull=False
         )
+        
+        # 디버깅: 쿼리 로깅
+        logger.info(f"[get_ai_generation_stats] user_id={user_id}, period={period}")
+        logger.info(f"[get_ai_generation_stats] 전체 AI 음악 수: {query.count()}")
         
         if period == 'month':
             start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             query = query.filter(created_at__gte=start_date)
+            logger.info(f"[get_ai_generation_stats] 이번 달 시작: {start_date}")
+            logger.info(f"[get_ai_generation_stats] 이번 달 AI 음악 수: {query.count()}")
         
         total_generated = query.count()
         
         # 마지막 생성 일시
         last_music = query.order_by('-created_at').first()
-        last_generated_at = last_music.created_at if last_music else None
+        last_generated_at = None
         last_generated_days_ago = None
         
-        if last_generated_at:
-            delta = now - last_generated_at
-            last_generated_days_ago = delta.days
+        if last_music:
+            logger.info(f"[get_ai_generation_stats] last_music: music_id={last_music.music_id}, music_name={last_music.music_name}")
+            logger.info(f"[get_ai_generation_stats] last_music.created_at: {last_music.created_at}")
+            if hasattr(last_music, 'created_at') and last_music.created_at:
+                last_generated_at = last_music.created_at
+                # timezone-aware로 변환 (DB에 naive datetime으로 저장된 경우 대비)
+                from django.utils.timezone import make_aware, is_aware
+                if not is_aware(last_generated_at):
+                    last_generated_at = make_aware(last_generated_at)
+                delta = now - last_generated_at
+                last_generated_days_ago = delta.days
+        else:
+            logger.info(f"[get_ai_generation_stats] last_music is None")
         
         return {
             'total_generated': total_generated,
@@ -430,10 +448,52 @@ class UserStatisticsService:
                 'ai_generation': {...}
             }
         """
-        return {
-            'listening_time': cls.get_listening_time(user_id, period),
-            'top_genres': cls.get_top_genres(user_id, period),
-            'top_artists': cls.get_top_artists(user_id, period),
-            'top_tags': cls.get_top_tags(user_id, period),
-            'ai_generation': cls.get_ai_generation_stats(user_id, period)
-        }
+        # 각 통계를 개별적으로 조회하고, 에러 발생 시 기본값 사용
+        result = {}
+        
+        # 청취 시간 통계
+        try:
+            result['listening_time'] = cls.get_listening_time(user_id, period)
+        except Exception as e:
+            logger.error(f"[get_listening_time] 오류: user_id={user_id}, error={e}", exc_info=True)
+            result['listening_time'] = {
+                'total_seconds': 0,
+                'total_hours': 0.0,
+                'play_count': 0,
+                'previous_period_hours': 0.0,
+                'change_percent': 0.0
+            }
+        
+        # Top 장르
+        try:
+            result['top_genres'] = cls.get_top_genres(user_id, period)
+        except Exception as e:
+            logger.error(f"[get_top_genres] 오류: user_id={user_id}, error={e}", exc_info=True)
+            result['top_genres'] = []
+        
+        # Top 아티스트
+        try:
+            result['top_artists'] = cls.get_top_artists(user_id, period)
+        except Exception as e:
+            logger.error(f"[get_top_artists] 오류: user_id={user_id}, error={e}", exc_info=True)
+            result['top_artists'] = []
+        
+        # Top 태그
+        try:
+            result['top_tags'] = cls.get_top_tags(user_id, period)
+        except Exception as e:
+            logger.error(f"[get_top_tags] 오류: user_id={user_id}, error={e}", exc_info=True)
+            result['top_tags'] = []
+        
+        # AI 생성 통계
+        try:
+            result['ai_generation'] = cls.get_ai_generation_stats(user_id, period)
+        except Exception as e:
+            logger.error(f"[get_ai_generation_stats] 오류: user_id={user_id}, error={e}", exc_info=True)
+            result['ai_generation'] = {
+                'total_generated': 0,
+                'last_generated_at': None,
+                'last_generated_days_ago': None
+            }
+        
+        return result
