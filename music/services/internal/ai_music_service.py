@@ -310,31 +310,79 @@ class AiMusicGenerationService:
         Returns:
             (Music, Artists, Albums, AiInfo) 튜플
         """
+        from music.utils.s3_upload import upload_image_to_s3, is_suno_url
+        
         now = timezone.now()
         
-        # Artists 저장
+        # Artists 저장 (먼저 생성하여 ID 확보)
         print(f"[DB 저장] Artists 저장 시작: artist_name={artist_name}")
         artist = Artists.objects.create(
             artist_name=artist_name,
-            artist_image=music_data['image_url'],
+            artist_image=None,  # 이미지는 나중에 업데이트
             created_at=now,
             updated_at=now,
             is_deleted=False
         )
         print(f"[DB 저장] ✅ Artists 저장 완료: artist_id={artist.artist_id}")
         
-        # Albums 저장
+        # Albums 저장 (먼저 생성하여 ID 확보)
         album_name = f"AI Generated - {music_data['title']}"
         print(f"[DB 저장] Albums 저장 시작: album_name={album_name}")
         album = Albums.objects.create(
             artist=artist,
             album_name=album_name,
-            album_image=music_data['image_url'],
+            album_image=None,  # 이미지는 나중에 업데이트
             created_at=now,
             updated_at=now,
             is_deleted=False
         )
         print(f"[DB 저장] ✅ Albums 저장 완료: album_id={album.album_id}")
+        
+        # Suno 이미지 URL을 S3에 업로드 및 리사이징 (CORS 문제 해결)
+        album_image_url = music_data['image_url']
+        if album_image_url and is_suno_url(album_image_url):
+            try:
+                print(f"[S3 이미지 업로드] Suno 이미지를 S3에 업로드 중: {album_image_url}")
+                # 실제 album_id 사용하여 S3 업로드 및 리사이징
+                resized_urls = upload_image_to_s3(
+                    image_url=album_image_url,
+                    image_type='albums',
+                    entity_id=album.album_id,
+                    entity_name=f"ai_album_{user_prompt[:20]}"
+                )
+                print(f"[S3 이미지 업로드] ✅ S3 업로드 완료")
+                print(f"  - original: {resized_urls.get('original', 'N/A')[:60]}...")
+                print(f"  - image_square (220x220): {resized_urls.get('image_square', 'N/A')[:60]}...")
+                print(f"  - image_large_square (360x360): {resized_urls.get('image_large_square', 'N/A')[:60]}...")
+                
+                # Album 이미지 URL 업데이트
+                album.album_image = resized_urls.get('original', album_image_url)
+                album.image_square = resized_urls.get('image_square')
+                album.image_large_square = resized_urls.get('image_large_square')
+                album.save(update_fields=['album_image', 'image_square', 'image_large_square', 'updated_at'])
+                print(f"[DB 저장] ✅ Albums 이미지 URL 업데이트 완료")
+                
+                # Artist 이미지도 동일하게 설정
+                artist.artist_image = resized_urls.get('original', album_image_url)
+                artist.save(update_fields=['artist_image', 'updated_at'])
+                print(f"[DB 저장] ✅ Artists 이미지 URL 업데이트 완료")
+                
+            except Exception as e:
+                print(f"[S3 이미지 업로드] ⚠️ S3 업로드 실패, 원본 URL 사용: {e}")
+                traceback.print_exc()
+                # S3 업로드 실패 시 원본 URL 사용 (fallback)
+                album.album_image = album_image_url
+                album.save(update_fields=['album_image', 'updated_at'])
+                artist.artist_image = album_image_url
+                artist.save(update_fields=['artist_image', 'updated_at'])
+        else:
+            # Suno URL이 아니거나 이미지가 없는 경우
+            if album_image_url:
+                album.album_image = album_image_url
+                album.save(update_fields=['album_image', 'updated_at'])
+                artist.artist_image = album_image_url
+                artist.save(update_fields=['artist_image', 'updated_at'])
+                print(f"[DB 저장] 원본 이미지 URL 사용: {album_image_url[:60]}...")
         
         # Music 저장
         print(f"[DB 저장] Music 저장 시작:")

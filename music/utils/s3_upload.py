@@ -277,10 +277,34 @@ def upload_image_to_s3(
         # Celery 태스크로 이미지 리사이징 시작 (Lambda 대신)
         try:
             from music.tasks.image_resize import resize_image_task
+            
+            # Celery 브로커 연결 확인
+            broker_url = getattr(settings, 'CELERY_BROKER_URL', '')
+            if 'rabbitmq' in broker_url and 'localhost' not in broker_url:
+                # Docker 컨테이너 호스트명이 설정되어 있으면 localhost로 변경 시도
+                logger.warning(
+                    f"[S3 이미지] Celery 브로커 URL이 컨테이너 호스트명을 사용 중: {broker_url}. "
+                    f"호스트에서 실행 시 CELERY_BROKER_URL=amqp://guest:guest@localhost:5672// 환경 변수를 설정하세요."
+                )
+            
             resize_image_task.delay(s3_key, image_type, entity_id)
             logger.info(f"[S3 이미지] 리사이징 태스크 시작: {s3_key}, entity_id={entity_id}")
         except Exception as e:
-            logger.warning(f"[S3 이미지] 리사이징 태스크 시작 실패 (계속 진행): {e}")
+            error_type = type(e).__name__
+            error_msg = str(e)
+            
+            # DNS 해석 실패 에러인 경우 더 자세한 안내
+            if 'nodename nor servname' in error_msg or 'gaierror' in error_type.lower():
+                logger.warning(
+                    f"[S3 이미지] 리사이징 태스크 시작 실패 (Celery 브로커 연결 실패): {error_msg}\n"
+                    f"  → 원인: Celery 브로커(RabbitMQ)에 연결할 수 없습니다.\n"
+                    f"  → 해결: 호스트에서 실행 시 다음 환경 변수를 설정하세요:\n"
+                    f"     export CELERY_BROKER_URL=amqp://guest:guest@localhost:5672//\n"
+                    f"  → 또는 Docker 컨테이너 내에서 실행하세요.\n"
+                    f"  → 계속 진행합니다 (이미지는 업로드되었지만 리사이징은 나중에 수동으로 처리해야 할 수 있습니다)."
+                )
+            else:
+                logger.warning(f"[S3 이미지] 리사이징 태스크 시작 실패 (계속 진행): {error_type}: {error_msg}")
         
         # 리사이징된 이미지 URL 생성 (예상 경로 - 실제 생성은 Celery 태스크에서)
         resized_urls = {}
