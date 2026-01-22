@@ -195,10 +195,12 @@ class PlaylistDetailView(APIView):
         playlist.delete()
         
         return Response(
-            {'message': '플레이리스트가 삭제되었습니다.'},
+            {
+                'message': '플레이리스트가 삭제되었습니다.',
+                'playlist_id': playlist_id  # 삭제된 ID 추가
+            },
             status=status.HTTP_200_OK
         )
-
 
 @extend_schema(tags=['플레이리스트'])
 class PlaylistItemAddView(APIView):

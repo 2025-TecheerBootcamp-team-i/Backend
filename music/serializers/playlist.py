@@ -25,7 +25,7 @@ class PlaylistSerializer(serializers.ModelSerializer):
         model = Playlists
         fields = [
             'playlist_id', 'title', 'visibility', 'user_id',
-            'item_count', 'like_count', 'created_at', 'updated_at'
+            'item_count', 'like_count', 'created_at', 'updated_at', 
         ]
     
     def get_item_count(self, obj):
@@ -116,7 +116,7 @@ class PlaylistCreateSerializer(serializers.ModelSerializer):
     
     def validate_visibility(self, value):
         """공개 범위 유효성 검사"""
-        valid_values = ['public', 'private']
+        valid_values = ['public', 'private', 'system']
         if value not in valid_values:
             raise serializers.ValidationError(
                 f"visibility는 {', '.join(valid_values)} 중 하나여야 합니다."
@@ -148,7 +148,7 @@ class PlaylistUpdateSerializer(serializers.ModelSerializer):
     def validate_visibility(self, value):
         """공개 범위 유효성 검사"""
         if value is not None:
-            valid_values = ['public', 'private']
+            valid_values = ['public', 'private', 'system']
             if value not in valid_values:
                 raise serializers.ValidationError(
                     f"visibility는 {', '.join(valid_values)} 중 하나여야 합니다."
