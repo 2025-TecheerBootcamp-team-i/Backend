@@ -148,35 +148,57 @@ services:
         limits:
           memory: 150M
 
-  # 8. Grafana Agent (메트릭 전송 - 최종 업그레이드)
+  # 8. Grafana Agent (메트릭 전송 - 완벽 설정)
   grafana-agent:
     image: grafana/agent:latest
-    pid: host
+    container_name: grafana-agent
+    # ===== [중요] 호스트 메트릭 수집을 위한 권한 =====
     privileged: true
+    pid: host
+    
     volumes:
       - ./monitoring/agent-cloud.yml:/etc/agent/agent.yaml:ro
       # ▼▼▼ [필수] 서버 내부 정보 읽기 권한
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /:/host/root:ro
+      - /:/host/root:ro,rslave
       # ▼▼▼ [필수] 도커 컨테이너 정보 읽기 권한
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # WAL 디렉토리 (메트릭 버퍼)
+      - grafana-agent-data:/tmp/agent
+    
     command: [
       "-config.file=/etc/agent/agent.yaml",
-      "-config.expand-env",
-      "-metrics.wal-directory=/tmp/agent/wal"
+      "-config.expand-env=true",
+      "-server.http.address=0.0.0.0:12345"
     ]
+    
+    ports:
+      - "12345:12345"  # Agent UI (선택사항, 디버깅용)
+    
     env_file:
       - .env.production
+    
+    environment:
+      - HOSTNAME=backend-server
+    
     networks:
       - ubuntu_gitops-network
+    
     restart: unless-stopped
     logging: *default-logging
+    
     deploy:
       resources:
         limits:
-          memory: 200M
+          memory: 256M
+        reservations:
+          memory: 128M
 
 networks:
   ubuntu_gitops-network:
     external: true
+
+volumes:
+  grafana-agent-data:
+    driver: local
