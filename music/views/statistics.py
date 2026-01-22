@@ -99,7 +99,7 @@ class UserStatisticsView(APIView):
             serializer = UserStatisticsSerializer(statistics)
             return Response(serializer.data)
         except Exception as e:
-            logger.error(f"[UserStatistics] 통계 조회 실패: user_id={user_id}, error={e}")
+            logger.error(f"[UserStatistics] 통계 조회 실패: user_id={user_id}, error={e}", exc_info=True)
             return Response(
                 {'error': '통계를 조회하는 중 오류가 발생했습니다.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -387,7 +387,7 @@ class UserAIGenerationView(APIView):
             serializer = AIGenerationStatSerializer(data)
             return Response(serializer.data)
         except Exception as e:
-            logger.error(f"[UserAIGeneration] 조회 실패: user_id={user_id}, error={e}")
+            logger.error(f"[UserAIGeneration] 조회 실패: user_id={user_id}, error={e}", exc_info=True)
             return Response(
                 {'error': 'AI 생성 통계를 조회하는 중 오류가 발생했습니다.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
