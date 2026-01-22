@@ -38,6 +38,7 @@ from .views import (
     PlaylistItemAddView,
     PlaylistItemDeleteView,
     PlaylistLikeView,
+    PlaylistLikedView,
 )
 
 # AI 음악 생성 (리팩토링된 CBV)
@@ -146,7 +147,11 @@ urlpatterns = [
     # POST /api/v1/playlists/{playlistId}/likes   - 좋아요
     # DELETE /api/v1/playlists/{playlistId}/likes - 좋아요 취소
     path('playlists/<int:playlist_id>/likes', PlaylistLikeView.as_view(), name='playlist-like'),
-    
+
+    # 좋아요한 플레이리스트 목록 조회 (GET)
+    # GET /api/v1/playlists/likes - 좋아요한 플레이리스트 목록
+    path('playlists/likes', PlaylistLikedView.as_view(), name='playlist-liked'),
+
     # ========================
     # AI 음악 생성 API (리팩토링된 CBV)
     # ========================

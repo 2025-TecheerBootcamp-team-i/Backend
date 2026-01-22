@@ -17,14 +17,14 @@ class PlaylistItemSerializer(serializers.ModelSerializer):
 
 class PlaylistSerializer(serializers.ModelSerializer):
     """플레이리스트 목록 조회용 Serializer (기본 정보만)"""
-    creator_nickname = serializers.CharField(source='user.nickname', read_only=True)
+    user_id = serializers.IntegerField(source='user.user_id', read_only=True)
     item_count = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Playlists
         fields = [
-            'playlist_id', 'title', 'visibility', 'creator_nickname',
+            'playlist_id', 'title', 'visibility', 'user_id',
             'item_count', 'like_count', 'created_at', 'updated_at'
         ]
     
@@ -45,16 +45,16 @@ class PlaylistSerializer(serializers.ModelSerializer):
 
 class PlaylistDetailSerializer(serializers.ModelSerializer):
     """플레이리스트 상세 조회용 Serializer (곡 목록 포함)"""
-    creator_nickname = serializers.CharField(source='user.nickname', read_only=True)
+    user_id = serializers.IntegerField(source='user.user_id', read_only=True)
     items = serializers.SerializerMethodField()
     item_count = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField()
     is_liked = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Playlists
         fields = [
-            'playlist_id', 'title', 'visibility', 'creator_nickname',
+            'playlist_id', 'title', 'visibility', 'user_id',
             'items', 'item_count', 'like_count', 'is_liked',
             'created_at', 'updated_at'
         ]
