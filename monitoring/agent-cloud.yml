@@ -3,7 +3,10 @@ server:
 
 metrics:
   global:
-    scrape_interval: 60s
+    scrape_interval: 15s
+    external_labels:
+      cluster: 'production'
+      environment: 'aws-ec2'
   wal_directory: /tmp/agent/wal
   configs:
     - name: default
@@ -12,26 +15,61 @@ metrics:
           basic_auth:
             username: 2926985
             password: ${GRAFANA_CLOUD_TOKEN}
-          
-          # ▼▼▼ [필승 해결책] 전송 직전에 모든 데이터의 이름을 강제로 덮어씌웁니다.
-          write_relabel_configs:
-            - target_label: instance
-              replacement: 'backend-server'  # 무조건 이 이름으로 변경!
-              action: replace
-
+          queue_config:
+            capacity: 10000
+            max_shards: 50
+            max_samples_per_send: 2000
+      
+      # Django 애플리케이션 메트릭 수집
       scrape_configs:
-        - job_name: agent
+        # 1. Grafana Agent 자체 메트릭
+        - job_name: 'grafana-agent'
           static_configs:
             - targets: ['localhost:12345']
+              labels:
+                instance: 'backend-server'
+                service: 'grafana-agent'
+        
+        # 2. Django Prometheus 메트릭
+        - job_name: 'django'
+          static_configs:
+            - targets: ['backend:8000']
+              labels:
+                instance: 'backend-server'
+                service: 'django-backend'
+          metrics_path: '/metrics'
 
+# ===== 핵심: Node Exporter 통합 (서버 메트릭) =====
 integrations:
   node_exporter:
     enabled: true
-    # instance 설정을 지우고 위에서 일괄 처리합니다
+    # 인스턴스 라벨 (Grafana Cloud에서 식별)
+    instance: 'backend-server'
+    
+    # 호스트 파일시스템 경로 (Docker 볼륨 마운트와 일치)
     rootfs_path: /host/root
     sysfs_path: /host/sys
     procfs_path: /host/proc
+    
+    # 활성화할 수집기
+    enable_collectors:
+      - cpu
+      - meminfo
+      - diskstats
+      - filesystem
+      - netdev
+      - netstat
+      - loadavg
+      - time
+    
+    # 파일시스템 마운트 포인트 필터 (불필요한 항목 제외)
+    filesystem_mount_points_exclude: "^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)"
+    filesystem_fs_types_exclude: "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
 
+  # cAdvisor 통합 (Docker 컨테이너 메트릭)
   cadvisor:
     enabled: true
+    instance: 'backend-server'
     docker_only: true
+    # Docker 소켓 경로
+    docker: unix:///var/run/docker.sock
