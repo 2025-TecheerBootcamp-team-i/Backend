@@ -153,14 +153,22 @@ class UserLikedAlbumSerializer(serializers.ModelSerializer):
     def get_is_liked(self, obj):
         """현재 사용자가 좋아요를 눌렀는지 여부"""
         request = self.context.get('request')
-        if not request or not request.user.is_authenticated:
+        if not request:
             return False
         
-        return AlbumLikes.objects.filter(
-            album=obj,
-            user=request.user,
-            is_deleted=False
-        ).exists()
+        # 인증된 사용자 확인
+        user = request.user
+        if not user or not hasattr(user, 'is_authenticated') or not user.is_authenticated:
+            return False
+        
+        try:
+            return AlbumLikes.objects.filter(
+                album=obj,
+                user=user,
+                is_deleted=False
+            ).exists()
+        except Exception:
+            return False
     
     def get_release_date(self, obj):
         """앨범 발매일 (created_at 사용)"""
