@@ -13,10 +13,10 @@ metrics:
             username: 2926985
             password: ${GRAFANA_CLOUD_TOKEN}
           
-          # ▼▼▼ [필승 해결책] 전송 직전에 모든 데이터의 이름을 강제로 덮어씌웁니다.
+          # 전송 직전 이름 강제 통일 (유지)
           write_relabel_configs:
             - target_label: instance
-              replacement: 'backend-server'  # 무조건 이 이름으로 변경!
+              replacement: 'backend-server'
               action: replace
 
       scrape_configs:
@@ -27,11 +27,12 @@ metrics:
 integrations:
   node_exporter:
     enabled: true
-    # instance 설정을 지우고 위에서 일괄 처리합니다
+    instance: 'backend-server'  # 👈 [복구] 이게 있어야 수집 목록에 뜹니다!
     rootfs_path: /host/root
     sysfs_path: /host/sys
     procfs_path: /host/proc
 
   cadvisor:
     enabled: true
+    instance: 'backend-server'  # 👈 [복구] 얘도 다시 추가!
     docker_only: true

@@ -151,6 +151,8 @@ services:
   # 8. Grafana Agent (메트릭 전송 - 최종 업그레이드)
   grafana-agent:
     image: grafana/agent:latest
+    pid: host
+    privileged: true
     volumes:
       - ./monitoring/agent-cloud.yml:/etc/agent/agent.yaml:ro
       # ▼▼▼ [필수] 서버 내부 정보 읽기 권한
