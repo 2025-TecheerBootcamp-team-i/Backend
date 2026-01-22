@@ -11,6 +11,7 @@ services:
   # 1. Django 백엔드
   backend:
     image: hhyuninu/2025_techeer_team_i:latest
+    container_name: backend
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
     env_file:
       - .env.production
