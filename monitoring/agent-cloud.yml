@@ -47,6 +47,13 @@ metrics:
 
 # ===== 핵심: Node Exporter 통합 (서버 메트릭) =====
 integrations:
+  # Integration 메트릭을 Grafana Cloud로 전송
+  prometheus_remote_write:
+    - url: https://prometheus-prod-49-prod-ap-northeast-0.grafana.net/api/prom/push
+      basic_auth:
+        username: 2926985
+        password: ${GRAFANA_CLOUD_TOKEN}
+  
   node_exporter:
     enabled: true
     # 인스턴스 라벨 (Grafana Cloud에서 식별)
