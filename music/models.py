@@ -46,6 +46,22 @@ class Albums(TrackableMixin, models.Model):
         verbose_name_plural = '2️⃣ 🎵 MUSIC - 앨범'
 
 
+class AlbumLikes(TrackableMixin, models.Model):
+    like_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey('Users', models.DO_NOTHING, blank=True, null=True)
+    album = models.ForeignKey(Albums, models.DO_NOTHING, blank=True, null=True)
+    # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
+
+    objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
+    all_objects = models.Manager()  # 모든 레코드 (삭제된 것 포함)
+
+    class Meta:
+        managed = False
+        db_table = 'album_likes'
+        verbose_name = '앨범 좋아요'
+        verbose_name_plural = '4️⃣ 📊 ANALYTICS - 앨범 좋아요'
+
+
 class Artists(TrackableMixin, models.Model):
     artist_id = models.BigAutoField(primary_key=True)
     artist_name = models.CharField(max_length=100)

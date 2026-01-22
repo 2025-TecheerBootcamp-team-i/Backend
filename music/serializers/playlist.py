@@ -18,14 +18,17 @@ class PlaylistItemSerializer(serializers.ModelSerializer):
 class PlaylistSerializer(serializers.ModelSerializer):
     """플레이리스트 목록 조회용 Serializer (기본 정보만)"""
     user_id = serializers.IntegerField(source='user.user_id', read_only=True)
+    creator_nickname = serializers.CharField(source='user.nickname', read_only=True)  # 추가 필요
     item_count = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()  # 추가 필요
 
     class Meta:
         model = Playlists
         fields = [
-            'playlist_id', 'title', 'visibility', 'user_id',
-            'item_count', 'like_count', 'created_at', 'updated_at', 
+            'playlist_id', 'title', 'visibility', 'user_id', 'creator_nickname',  # creator_nickname 추가
+            'item_count', 'like_count', 'is_liked',  # is_liked 추가
+            'created_at', 'updated_at', 
         ]
     
     def get_item_count(self, obj):
@@ -41,6 +44,18 @@ class PlaylistSerializer(serializers.ModelSerializer):
             playlist=obj,
             is_deleted=False
         ).count()
+    
+    def get_is_liked(self, obj):
+        """현재 사용자가 좋아요를 눌렀는지 여부"""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        
+        return PlaylistLikes.objects.filter(
+            playlist=obj,
+            user=request.user,
+            is_deleted=False
+        ).exists()
 
 
 class PlaylistDetailSerializer(serializers.ModelSerializer):

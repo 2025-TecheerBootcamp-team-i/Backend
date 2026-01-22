@@ -22,7 +22,7 @@ from .auth import (
 )
 
 # 좋아요 관련 Views
-from .likes import MusicLikeView, UserLikedMusicListView
+from .likes import MusicLikeView, UserLikedMusicListView, AlbumLikeView, UserLikedAlbumsView
 
 # 검색 관련 Views
 from .search import MusicSearchView, AiMusicSearchView
@@ -87,6 +87,8 @@ __all__ = [
     # likes
     'MusicLikeView',
     'UserLikedMusicListView',
+    'AlbumLikeView',
+    'UserLikedAlbumsView',
     # search
     'MusicSearchView',
     'AiMusicSearchView',
@@ -118,6 +120,7 @@ __all__ = [
     'PlaylistItemAddView',
     'PlaylistItemDeleteView',
     'PlaylistLikeView',
+    'PlaylistLikedView',
     # legacy (함수 기반 - 템플릿 렌더링용)
     'music_generator_page',
     'music_list_page',

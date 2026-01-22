@@ -39,6 +39,9 @@ from .views import (
     PlaylistItemDeleteView,
     PlaylistLikeView,
     PlaylistLikedView,
+    # 앨범 좋아요
+    AlbumLikeView,
+    UserLikedAlbumsView,
 )
 
 # AI 음악 생성 (리팩토링된 CBV)
@@ -107,6 +110,15 @@ urlpatterns = [
     # 앨범 상세 조회
     # GET /api/v1/albums/{album_id}/
     path('albums/<int:album_id>/', AlbumDetailView.as_view(), name='album-detail'),
+    
+    # 앨범 좋아요 등록/취소
+    # POST /api/v1/albums/{album_id}/likes
+    # DELETE /api/v1/albums/{album_id}/likes
+    path('albums/<int:album_id>/likes', AlbumLikeView.as_view(), name='album-like'),
+    
+    # 좋아요한 앨범 목록 조회
+    # GET /api/v1/albums/likes
+    path('albums/likes', UserLikedAlbumsView.as_view(), name='album-liked-list'),
     
     # 좋아요 등록/취소 (POST, DELETE만 지원)
     # POST /api/v1/tracks/{music_id}/like
