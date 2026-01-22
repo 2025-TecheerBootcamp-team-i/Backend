@@ -52,6 +52,16 @@ metrics:
               labels:
                 instance: 'backend-server'
                 service: 'cadvisor'
+          metric_relabel_configs:
+            # id에서 컨테이너 ID 추출 (docker-<container_id>.scope)
+            - source_labels: [id]
+              regex: '.*/docker-([0-9a-f]+)\.scope'
+              target_label: container_id
+              replacement: '$1'
+            # Docker 컨테이너만 필터링
+            - source_labels: [id]
+              regex: '/system\.slice/docker-.*'
+              action: keep
 
 # ===== 핵심: Node Exporter 통합 (서버 메트릭) =====
 integrations:
