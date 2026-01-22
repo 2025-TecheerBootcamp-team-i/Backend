@@ -149,7 +149,31 @@ services:
         limits:
           memory: 150M
 
-  # 8. Grafana Agent (메트릭 전송 - 완벽 설정)
+  # 8. cAdvisor (컨테이너 메트릭 수집)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+
+  # 9. Grafana Agent (메트릭 전송 - 완벽 설정)
   grafana-agent:
     image: grafana/agent:latest
     container_name: grafana-agent

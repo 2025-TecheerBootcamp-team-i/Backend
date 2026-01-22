@@ -44,6 +44,14 @@ metrics:
                 instance: 'backend-server'
                 service: 'django-backend'
           metrics_path: '/metrics'
+        
+        # 3. cAdvisor (컨테이너 메트릭)
+        - job_name: 'cadvisor'
+          static_configs:
+            - targets: ['cadvisor:8080']
+              labels:
+                instance: 'backend-server'
+                service: 'cadvisor'
 
 # ===== 핵심: Node Exporter 통합 (서버 메트릭) =====
 integrations:
@@ -78,11 +86,3 @@ integrations:
     # 파일시스템 마운트 포인트 필터 (불필요한 항목 제외)
     filesystem_mount_points_exclude: "^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)"
     filesystem_fs_types_exclude: "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
-
-  # cAdvisor 통합 (Docker 컨테이너 메트릭)
-  cadvisor:
-    enabled: true
-    instance: 'backend-server'
-    docker_only: true
-    # Docker 소켓 경로
-    docker: unix:///var/run/docker.sock
