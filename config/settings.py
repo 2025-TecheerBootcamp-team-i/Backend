@@ -267,6 +267,7 @@ else:
         'https://your-frontend-domain.vercel.app',  # Vercel 배포 도메인 (실제 도메인으로 변경 필요)
         'http://localhost:3000',  # React 개발 서버 (로컬 테스트용)
         'http://localhost:5173',  # Vite 개발 서버 (로컬 테스트용)
+        'http://localhost:4173', 
     ]
 
 # CORS 쿠키 및 인증 정보 전송 허용
