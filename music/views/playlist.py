@@ -95,7 +95,7 @@ class PlaylistLikedView(APIView):
 
     - GET: 좋아요한 플레이리스트 목록 조회
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # IsAuthenticated에서 AllowAny로 변경 (앨범 API와 일관성)
 
     def get(self, request):
         """
@@ -104,21 +104,43 @@ class PlaylistLikedView(APIView):
         
         시스템 플레이리스트는 제외하고 반환합니다.
         """
-        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
-        liked_playlist_ids = PlaylistLikes.objects.filter(
-            user=request.user
-        ).values_list('playlist_id', flat=True)
+        try:
+            # 인증 확인 (테스트용: 인증 없으면 userId 1 사용)
+            if not request.user or not request.user.is_authenticated:
+                # 테스트용: userId 1 사용
+                user = get_object_or_404(Users, user_id=1)
+            else:
+                user = request.user
+            
+            # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+            liked_playlist_ids = PlaylistLikes.objects.filter(
+                user=user
+            ).values_list('playlist_id', flat=True)
 
-        # 좋아요한 플레이리스트들 조회 (SoftDeleteManager 자동 적용)
-        # 시스템 플레이리스트 제외
-        queryset = Playlists.objects.filter(
-            playlist_id__in=liked_playlist_ids
-        ).exclude(
-            visibility='system'
-        ).order_by('-created_at')
+            # 좋아요한 플레이리스트들 조회 (SoftDeleteManager 자동 적용)
+            # 시스템 플레이리스트 제외
+            queryset = Playlists.objects.filter(
+                playlist_id__in=liked_playlist_ids
+            ).exclude(
+                visibility='system'
+            ).order_by('-created_at')
 
-        serializer = PlaylistSerializer(queryset, many=True, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            serializer = PlaylistSerializer(queryset, many=True, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            # 에러 로깅
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"좋아요한 플레이리스트 조회 실패: {str(e)}", exc_info=True)
+            
+            return Response(
+                {
+                    'error': '좋아요한 플레이리스트 조회 중 오류가 발생했습니다.',
+                    'detail': str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 @extend_schema(tags=['플레이리스트'])
 class PlaylistDetailView(APIView):
