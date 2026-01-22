@@ -62,7 +62,7 @@ class PlaylistListCreateView(APIView):
         # 최신순 정렬
         queryset = queryset.order_by('-created_at')
         
-        serializer = PlaylistSerializer(queryset, many=True)
+        serializer = PlaylistSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def post(self, request):
@@ -101,6 +101,8 @@ class PlaylistLikedView(APIView):
         """
         좋아요한 플레이리스트 목록 조회
         GET /api/v1/playlists/likes
+        
+        시스템 플레이리스트는 제외하고 반환합니다.
         """
         # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         liked_playlist_ids = PlaylistLikes.objects.filter(
@@ -108,11 +110,14 @@ class PlaylistLikedView(APIView):
         ).values_list('playlist_id', flat=True)
 
         # 좋아요한 플레이리스트들 조회 (SoftDeleteManager 자동 적용)
+        # 시스템 플레이리스트 제외
         queryset = Playlists.objects.filter(
             playlist_id__in=liked_playlist_ids
+        ).exclude(
+            visibility='system'
         ).order_by('-created_at')
 
-        serializer = PlaylistSerializer(queryset, many=True)
+        serializer = PlaylistSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 @extend_schema(tags=['플레이리스트'])
@@ -158,6 +163,13 @@ class PlaylistDetailView(APIView):
         # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         playlist = get_object_or_404(Playlists, playlist_id=playlist_id)
         
+        # 시스템 플레이리스트는 수정 불가
+        if playlist.visibility == 'system':
+            return Response(
+                {'error': '시스템 플레이리스트는 수정할 수 없습니다.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         # 권한 확인: 자신의 플레이리스트만 수정 가능
         if playlist.user != request.user:
             return Response(
@@ -183,6 +195,13 @@ class PlaylistDetailView(APIView):
         """
         # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         playlist = get_object_or_404(Playlists, playlist_id=playlist_id)
+        
+        # 시스템 플레이리스트는 삭제 불가
+        if playlist.visibility == 'system':
+            return Response(
+                {'error': '시스템 플레이리스트는 삭제할 수 없습니다.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         # 권한 확인: 자신의 플레이리스트만 삭제 가능
         if playlist.user != request.user:
@@ -332,6 +351,20 @@ class PlaylistLikeView(APIView):
         """
         # 플레이리스트 존재 확인 (SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회)
         playlist = get_object_or_404(Playlists, playlist_id=playlist_id)
+        
+        # 시스템 플레이리스트에는 좋아요 불가
+        if playlist.visibility == 'system':
+            return Response(
+                {'error': '시스템 플레이리스트에는 좋아요를 할 수 없습니다.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 자신의 플레이리스트에는 좋아요 불가
+        if playlist.user == request.user:
+            return Response(
+                {'error': '자신의 플레이리스트에는 좋아요를 할 수 없습니다.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         # 공개 플레이리스트만 좋아요 가능 (선택적, 요구사항에 따라 변경 가능)
         if playlist.visibility == 'private' and playlist.user != request.user:
