@@ -107,14 +107,14 @@ urlpatterns = [
     # GET /api/v1/albums/{album_id}/
     path('albums/<int:album_id>/', AlbumDetailView.as_view(), name='album-detail'),
     
-    # 사용자가 좋아요한 곡 목록 조회 (GET만 지원)
-    # GET /api/v1/tracks/{user_id}/likes
-    path('tracks/<int:user_id>/likes', UserLikedMusicListView.as_view(), name='user-liked-music-list'),
-    
     # 좋아요 등록/취소 (POST, DELETE만 지원)
-    # POST /api/v1/tracks/{music_id}/likes
-    # DELETE /api/v1/tracks/{music_id}/likes
-    path('tracks/<int:music_id>/likes', MusicLikeView.as_view(), name='music-like'),
+    # POST /api/v1/tracks/{music_id}/like
+    # DELETE /api/v1/tracks/{music_id}/like
+    path('tracks/<int:music_id>/like', MusicLikeView.as_view(), name='music-like'),
+    
+    # 사용자가 좋아요한 곡 목록 조회 (GET만 지원)
+    # GET /api/v1/users/{user_id}/likes
+    path('users/<int:user_id>/likes', UserLikedMusicListView.as_view(), name='user-liked-music-list'),
     
     # 차트 조회
     # GET /api/v1/charts/{type} (realtime|daily|ai)

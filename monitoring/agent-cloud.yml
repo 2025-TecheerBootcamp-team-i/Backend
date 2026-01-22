@@ -19,7 +19,13 @@ metrics:
             capacity: 10000
             max_shards: 50
             max_samples_per_send: 2000
-      
+     
+          # 전송 직전 이름 강제 통일 (유지)
+          write_relabel_configs:
+            - target_label: instance
+              replacement: 'backend-server'
+              action: replace
+              
       # Django 애플리케이션 메트릭 수집
       scrape_configs:
         # 1. Grafana Agent 자체 메트릭
