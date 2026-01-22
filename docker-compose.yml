@@ -104,64 +104,57 @@ services:
   # ===== 모니터링 스택 =====
 
   # Prometheus - 메트릭 수집 및 저장
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    ports:
-      - "9090:9090"  # Prometheus 웹 UI (http://localhost:9090)
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro  # 설정 파일
-      - prometheus_data:/prometheus  # 데이터 영속화
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.enable-lifecycle'  # 설정 리로드 API 활성화
-    restart: unless-stopped
+  #prometheus:
+  #  image: prom/prometheus:latest
+  #  container_name: prometheus
+  #  ports:
+  #    - "9090:9090"  # Prometheus 웹 UI (http://localhost:9090)
+  #  volumes:
+  #    - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro  # 설정 파일
+  #    - prometheus_data:/prometheus  # 데이터 영속화
+  #  command:
+  #    - '--config.file=/etc/prometheus/prometheus.yml'
+  #    - '--storage.tsdb.path=/prometheus'
+  #    - '--web.enable-lifecycle'  # 설정 리로드 API 활성화
+  #  restart: unless-stopped
 
   # Grafana - 시각화 대시보드
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - "3000:3000"  # Grafana 웹 UI (http://localhost:3000)
-    volumes:
-      - grafana_data:/var/lib/grafana  # 대시보드 및 설정 영속화
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro  # 데이터소스/프로비저닝 설정
-      # 대시보드 JSON 파일들은 /var/lib/grafana/dashboards로 마운트하여 자동 로드
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin123  # 프로덕션에서는 .env로 관리
-      - GF_USERS_ALLOW_SIGN_UP=false
-    depends_on:
-      - prometheus
-      - loki
-    restart: unless-stopped
+  #grafana:
+    #image: grafana/grafana:latest
+  #  container_name: grafana
+  #  ports:
+  #    - "3000:3000"  # Grafana 웹 UI (http://localhost:3000)
+  #  volumes:
+  #    - grafana_data:/var/lib/grafana  # 대시보드 및 설정 영속화
+  #    - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro  # 데이터소스/프로비저닝 설정
+  #    # 대시보드 JSON 파일들은 /var/lib/grafana/dashboards로 마운트하여 자동 로드
+  #    - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
 
   # Loki - 로그 수집 및 저장 (Grafana Labs)
-  loki:
-    image: grafana/loki:latest
-    container_name: loki
-    ports:
-      - "3100:3100"  # Loki API 포트
-    volumes:
-      - ./monitoring/loki.yml:/etc/loki/local-config.yaml:ro  # 설정 파일
-      - loki_data:/loki  # 로그 데이터 영속화
-    command: -config.file=/etc/loki/local-config.yaml
-    restart: unless-stopped
+  #loki:
+    #image: grafana/loki:latest
+    #container_name: loki
+    #ports:
+    #  - "3100:3100"  # Loki API 포트
+    #volumes:
+    #  - ./monitoring/loki.yml:/etc/loki/local-config.yaml:ro  # 설정 파일
+    #  - loki_data:/loki  # 로그 데이터 영속화
+    #command: -config.file=/etc/loki/local-config.yaml
+    #restart: unless-stopped
 
   # Promtail - 로그 수집 에이전트 (컨테이너 로그 → Loki)
-  promtail:
-    image: grafana/promtail:latest
-    container_name: promtail
-    volumes:
-      - ./monitoring/promtail.yml:/etc/promtail/config.yml:ro  # 설정 파일
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro  # Docker 컨테이너 로그
-      - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker 소켓 (컨테이너 메타데이터)
-    command: -config.file=/etc/promtail/config.yml
-    depends_on:
-      - loki
-    restart: unless-stopped
+  
+  #promtail:
+    #image: grafana/promtail:latest
+    #container_name: promtail
+    #volumes:
+    #  - ./monitoring/promtail.yml:/etc/promtail/config.yml:ro  # 설정 파일
+    #  - /var/lib/docker/containers:/var/lib/docker/containers:ro  # Docker 컨테이너 로그
+    #  - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker 소켓 (컨테이너 메타데이터)
+    #command: -config.file=/etc/promtail/config.yml
+    #depends_on:
+    #  - loki
+    #restart: unless-stopped
 
 volumes:
   postgres_data: # PostgreSQL 데이터 저장을 위한 명명된 볼륨

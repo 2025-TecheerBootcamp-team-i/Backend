@@ -57,6 +57,7 @@ from .playlist import (
     PlaylistItemAddView,
     PlaylistItemDeleteView,
     PlaylistLikeView,
+    PlaylistLikedView,
 )
 
 # AI 음악 생성 Views (리팩토링된 CBV)

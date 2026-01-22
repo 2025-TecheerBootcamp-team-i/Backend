@@ -44,7 +44,6 @@ class PlaylistListCreateView(APIView):
         """
         # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
         queryset = Playlists.objects.all()
-        
         # 공개 범위 필터링
         visibility = request.query_params.get('visibility')
         if visibility:
@@ -88,7 +87,33 @@ class PlaylistListCreateView(APIView):
             return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+@extend_schema(tags=['플레이리스트'])
+class PlaylistLikedView(APIView):
+    """
+    좋아요한 플레이리스트 목록 조회 API
 
+    - GET: 좋아요한 플레이리스트 목록 조회
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        좋아요한 플레이리스트 목록 조회
+        GET /api/v1/playlists/likes
+        """
+        # SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회
+        liked_playlist_ids = PlaylistLikes.objects.filter(
+            user=request.user
+        ).values_list('playlist_id', flat=True)
+
+        # 좋아요한 플레이리스트들 조회 (SoftDeleteManager 자동 적용)
+        queryset = Playlists.objects.filter(
+            playlist_id__in=liked_playlist_ids
+        ).order_by('-created_at')
+
+        serializer = PlaylistSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 @extend_schema(tags=['플레이리스트'])
 class PlaylistDetailView(APIView):
