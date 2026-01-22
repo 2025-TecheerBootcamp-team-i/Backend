@@ -18,7 +18,7 @@ class MusicLikeView(APIView):
     - POST: 좋아요 등록
     - DELETE: 좋아요 취소
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     @extend_schema(
         summary="좋아요 등록",
@@ -29,14 +29,21 @@ class MusicLikeView(APIView):
     def post(self, request, music_id):
         """
         좋아요 등록
-        POST /api/v1/tracks/{musicId}/likes
+        POST /api/v1/tracks/{musicId}/like
         """
+        # 인증 확인 (테스트용: 인증 없으면 userId 1 사용)
+        if not request.user or not request.user.is_authenticated:
+            # 테스트용: userId 1 사용
+            user = get_object_or_404(Users, user_id=1)
+        else:
+            user = request.user
+        
         # 음악 존재 확인 (SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회)
         music = get_object_or_404(Music, music_id=music_id)
         
         # 이미 좋아요가 있는지 확인
         # SoftDeleteManager를 사용하므로 all_objects로 삭제된 것도 확인
-        like = MusicLikes.all_objects.filter(user=request.user, music=music).first()
+        like = MusicLikes.all_objects.filter(user=user, music=music).first()
         
         if like:
             if like.is_deleted:
@@ -54,7 +61,7 @@ class MusicLikeView(APIView):
                 )
         else:
             # 새로운 좋아요 생성
-            like = MusicLikes.objects.create(user=request.user, music=music)
+            like = MusicLikes.objects.create(user=user, music=music)
         
         serializer = MusicLikeSerializer({
             'message': '좋아요가 등록되었습니다.',
@@ -72,14 +79,21 @@ class MusicLikeView(APIView):
     def delete(self, request, music_id):
         """
         좋아요 취소
-        DELETE /api/v1/tracks/{musicId}/likes
+        DELETE /api/v1/tracks/{musicId}/like
         """
+        # 인증 확인 (테스트용: 인증 없으면 userId 1 사용)
+        if not request.user or not request.user.is_authenticated:
+            # 테스트용: userId 1 사용
+            user = get_object_or_404(Users, user_id=1)
+        else:
+            user = request.user
+        
         # 음악 존재 확인 (SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회)
         music = get_object_or_404(Music, music_id=music_id)
         
         # 좋아요 찾기 (SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회)
         try:
-            like = MusicLikes.objects.get(user=request.user, music=music)
+            like = MusicLikes.objects.get(user=user, music=music)
             # TrackableMixin의 delete() 메서드가 자동으로 Soft Delete 수행
             like.delete()
             
@@ -119,7 +133,7 @@ class UserLikedMusicListView(APIView):
     def get(self, request, user_id):
         """
         사용자가 좋아요한 곡 목록 조회
-        GET /api/v1/tracks/{user_id}/likes
+        GET /api/v1/users/{user_id}/likes
         """
         # 사용자 존재 확인
         user = get_object_or_404(Users, user_id=user_id)
@@ -130,6 +144,18 @@ class UserLikedMusicListView(APIView):
             is_deleted=False
         ).values_list('music_id', flat=True)
         
+        # 좋아요한 곡이 없는 경우
+        if not liked_music_ids:
+            return Response(
+                {
+                    'message': '좋아요한 곡이 없습니다.',
+                    'user_id': user_id,
+                    'count': 0,
+                    'results': []
+                },
+                status=status.HTTP_200_OK
+            )
+        
         # 좋아요한 곡들의 상세 정보 조회 (select_related로 최적화)
         liked_musics = Music.objects.filter(
             music_id__in=liked_music_ids,
@@ -138,4 +164,12 @@ class UserLikedMusicListView(APIView):
         
         serializer = UserLikedMusicSerializer(liked_musics, many=True)
         
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(
+            {
+                'message': '좋아요한 곡 목록을 조회했습니다.',
+                'user_id': user_id,
+                'count': liked_musics.count(),
+                'results': serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
