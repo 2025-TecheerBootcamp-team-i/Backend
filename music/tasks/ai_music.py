@@ -98,24 +98,69 @@ def generate_music_task(self, user_prompt: str, user_id: int = None, make_instru
         # task_id 추출 (Webhook에서 사용)
         task_id = music_result.get('taskId') or music_result.get('task_id') or 'unknown'
         
-        # 4. Artists 모델에 저장
+        # 4. Artists 모델에 저장 (먼저 생성하여 ID 확보)
         artist = Artists.objects.create(
             artist_name=artist_name,
-            artist_image=image_url,
+            artist_image=None,  # 이미지는 나중에 업데이트
             created_at=now,
             updated_at=now,
             is_deleted=False
         )
         
-        # 5. Albums 모델에 AI 앨범 저장
+        # 5. Albums 모델에 AI 앨범 저장 (먼저 생성하여 ID 확보)
         album = Albums.objects.create(
             artist=artist,
             album_name=f"AI Generated - {music_title}",
-            album_image=image_url,
+            album_image=None,  # 이미지는 나중에 업데이트
             created_at=now,
             updated_at=now,
             is_deleted=False
         )
+        
+        # Suno 이미지 URL을 S3에 업로드 및 리사이징 (CORS 문제 해결)
+        if image_url and is_suno_url(image_url):
+            try:
+                logger.info(f"[S3 이미지 업로드] Suno 이미지를 S3에 업로드 중: {image_url}")
+                # 실제 album_id 사용하여 S3 업로드 및 리사이징
+                resized_urls = upload_image_to_s3(
+                    image_url=image_url,
+                    image_type='albums',
+                    entity_id=album.album_id,
+                    entity_name=f"ai_album_{user_prompt[:20]}"
+                )
+                logger.info(f"[S3 이미지 업로드] ✅ S3 업로드 완료")
+                logger.info(f"  - original: {resized_urls.get('original', 'N/A')[:60] if resized_urls.get('original') else 'N/A'}...")
+                logger.info(f"  - image_square (220x220): {resized_urls.get('image_square', 'N/A')[:60] if resized_urls.get('image_square') else 'N/A'}...")
+                logger.info(f"  - image_large_square (360x360): {resized_urls.get('image_large_square', 'N/A')[:60] if resized_urls.get('image_large_square') else 'N/A'}...")
+                
+                # Album 이미지 URL 업데이트
+                album.album_image = resized_urls.get('original', image_url)
+                album.image_square = resized_urls.get('image_square')
+                album.image_large_square = resized_urls.get('image_large_square')
+                album.save(update_fields=['album_image', 'image_square', 'image_large_square', 'updated_at'])
+                logger.info(f"[S3 이미지 업로드] ✅ Albums 이미지 URL 업데이트 완료: album_id={album.album_id}")
+                
+                # Artist 이미지도 동일하게 설정
+                artist.artist_image = resized_urls.get('original', image_url)
+                artist.save(update_fields=['artist_image', 'updated_at'])
+                logger.info(f"[S3 이미지 업로드] ✅ Artists 이미지 URL 업데이트 완료: artist_id={artist.artist_id}")
+                
+            except Exception as e:
+                logger.warning(f"[S3 이미지 업로드] ⚠️ S3 업로드 실패, 원본 URL 사용: {e}")
+                import traceback
+                traceback.print_exc()
+                # S3 업로드 실패 시 원본 URL 사용 (fallback)
+                album.album_image = image_url
+                album.save(update_fields=['album_image', 'updated_at'])
+                artist.artist_image = image_url
+                artist.save(update_fields=['artist_image', 'updated_at'])
+        elif image_url:
+            # Suno URL이 아닌 경우 원본 URL 사용
+            album.album_image = image_url
+            album.save(update_fields=['album_image', 'updated_at'])
+            artist.artist_image = image_url
+            artist.save(update_fields=['artist_image', 'updated_at'])
+            logger.info(f"[S3 이미지 업로드] 원본 이미지 URL 사용: {image_url[:60]}...")
         
         # 6. Music 모델에 저장
         music = Music.objects.create(
@@ -486,13 +531,19 @@ def process_suno_webhook_task(self, webhook_data: dict):
                         entity_id=album.album_id,
                         entity_name=album.album_name
                     )
-                    # 원본 이미지 URL 저장 (Lambda가 리사이징한 사각형 이미지는 image_square 필드에 자동 저장됨)
+                    # 원본 및 리사이징된 이미지 URL 저장
                     album.album_image = resized_urls.get('original')
                     album.image_square = resized_urls.get('image_square')  # 220x220
+                    album.image_large_square = resized_urls.get('image_large_square')  # 360x360
                     logger.info(f"[Webhook 태스크] 앨범 이미지 S3 업로드 완료: album_id={album.album_id}")
+                    logger.info(f"  - original: {resized_urls.get('original', 'N/A')[:60] if resized_urls.get('original') else 'N/A'}...")
+                    logger.info(f"  - image_square: {resized_urls.get('image_square', 'N/A')[:60] if resized_urls.get('image_square') else 'N/A'}...")
+                    logger.info(f"  - image_large_square: {resized_urls.get('image_large_square', 'N/A')[:60] if resized_urls.get('image_large_square') else 'N/A'}...")
                 except Exception as upload_error:
                     # S3 업로드 실패 시 원본 URL이라도 저장
                     logger.warning(f"[Webhook 태스크] 앨범 이미지 S3 업로드 실패, 원본 URL 저장: {upload_error}")
+                    import traceback
+                    traceback.print_exc()
                     album.album_image = image_url
             elif image_url:
                 # 이미 S3 URL이면 그대로 저장
