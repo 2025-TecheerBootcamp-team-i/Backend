@@ -42,11 +42,16 @@ services:
         limits:
           memory: 600M
 
-  # 2. RabbitMQ
+  # 2. RabbitMQ (Prometheus 메트릭 플러그인 활성화)
   rabbitmq:
     image: rabbitmq:3-management
     ports:
-      - "15672:15672"
+      - "15672:15672"  # Management UI
+      - "15692:15692"  # Prometheus metrics
+    volumes:
+      - ./monitoring/rabbitmq_enabled_plugins:/etc/rabbitmq/enabled_plugins
+    environment:
+      - RABBITMQ_PROMETHEUS_PLUGIN_ENABLED=true
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
