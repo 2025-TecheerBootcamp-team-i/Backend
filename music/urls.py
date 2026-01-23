@@ -46,6 +46,8 @@ from .views import (
     # 앨범 좋아요
     AlbumLikeView,
     UserLikedAlbumsView,
+    # 음악 추천
+    MusicRecommendationView,
 )
 
 # OpenSearch 검색
@@ -278,4 +280,11 @@ urlpatterns = [
     # AI 생성 활동 통계
     # GET /api/v1/users/{user_id}/statistics/ai-generation/
     path('users/<int:user_id>/statistics/ai-generation/', UserAIGenerationView.as_view(), name='user-ai-generation'),
+    
+    # ========================
+    # 음악 추천 API
+    # ========================
+    # 음악 추천
+    # GET /api/v1/recommendations/?type=tag|genre|emotion&music_id={music_id}&limit=10
+    path('recommendations/', MusicRecommendationView.as_view(), name='music-recommendations'),
 ]
