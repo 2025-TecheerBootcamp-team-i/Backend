@@ -24,6 +24,7 @@ from .views import (
     ErrorTestView,
     DatabaseQueryTestView,
     PlayLogView,
+    MusicPlayLogsView,
     ChartView,
     # 사용자 통계
     UserStatisticsView,
@@ -92,6 +93,10 @@ urlpatterns = [
     # GET /api/v1/tracks/{music_id}/play - 재생 정보 조회 (로그 저장 안 함)
     # POST /api/v1/tracks/{music_id}/play - 재생 로그 기록
     path('tracks/<int:music_id>/play', PlayLogView.as_view(), name='music-play'),
+    
+    # 음악별 재생 로그 목록 조회
+    # GET /api/v1/playlogs/{music_id}/ - 특정 음악의 재생 로그 조회
+    path('playlogs/<int:music_id>/', MusicPlayLogsView.as_view(), name='music-playlogs'),
     
     # 음악 태그 조회
     # GET /api/v1/tracks/{music_id}/tags - music_id로 태그 목록 조회

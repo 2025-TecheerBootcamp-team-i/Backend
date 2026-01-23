@@ -20,6 +20,22 @@ class PlayLogResponseSerializer(serializers.Serializer):
     played_at = serializers.DateTimeField()
 
 
+class PlayLogListItemSerializer(serializers.ModelSerializer):
+    """재생 로그 목록 항목 Serializer"""
+    user_id = serializers.IntegerField(source='user.user_id', read_only=True)
+    played_at = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PlayLogs
+        fields = ['user_id', 'played_at']
+    
+    def get_played_at(self, obj):
+        """played_at에서 소수점(마이크로초) 제거"""
+        if obj.played_at:
+            return obj.played_at.replace(microsecond=0)
+        return None
+
+
 class ChartMusicSerializer(serializers.ModelSerializer):
     """차트 항목에 표시할 음악 정보 (간략화)"""
     artist = ArtistSerializer(read_only=True)
