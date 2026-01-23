@@ -66,6 +66,7 @@ from .playlist import (
 from .charts import (
     PlayLogCreateSerializer,
     PlayLogResponseSerializer,
+    PlayLogListItemSerializer,
     ChartMusicSerializer,
     ChartItemSerializer,
     ChartResponseSerializer,
@@ -126,6 +127,7 @@ __all__ = [
     # charts
     'PlayLogCreateSerializer',
     'PlayLogResponseSerializer',
+    'PlayLogListItemSerializer',
     'ChartMusicSerializer',
     'ChartItemSerializer',
     'ChartResponseSerializer',

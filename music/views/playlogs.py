@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from ..models import Music, PlayLogs, Users
-from ..serializers import PlayLogResponseSerializer
+from ..serializers import PlayLogResponseSerializer, PlayLogListItemSerializer
 
 
 class PlayLogCreateView(APIView):
@@ -118,3 +118,62 @@ class PlayLogView(APIView):
     def post(self, request, music_id):
         """재생 기록 생성 - PlayLogCreateView로 위임"""
         return PlayLogCreateView().post(request, music_id)
+
+
+class MusicPlayLogsView(APIView):
+    """
+    음악 ID로 재생 로그 목록 조회 API
+    - GET: 특정 음악의 모든 재생 로그 조회 (user_id, played_at)
+    """
+    permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="음악별 재생 로그 조회",
+        description="""
+        특정 음악의 재생 로그 목록을 조회합니다.
+        
+        **반환 정보:**
+        - user_id: 재생한 사용자 ID
+        - played_at: 재생 시간 (소수점 제거)
+        
+        **참고:**
+        - 삭제되지 않은 재생 로그만 조회됨
+        - 최신 재생 순으로 정렬
+        """,
+        responses={
+            200: OpenApiResponse(
+                response=PlayLogListItemSerializer(many=True),
+                description="재생 로그 조회 성공",
+                examples=[
+                    OpenApiExample(
+                        name="성공 응답",
+                        value=[
+                            {
+                                "user_id": 1,
+                                "played_at": "2026-01-23T15:30:00Z"
+                            },
+                            {
+                                "user_id": 2,
+                                "played_at": "2026-01-23T14:20:00Z"
+                            }
+                        ]
+                    )
+                ]
+            ),
+            404: OpenApiResponse(description="음악을 찾을 수 없음"),
+        },
+        tags=['음악 재생']
+    )
+    def get(self, request, music_id):
+        """특정 음악의 재생 로그 목록 조회"""
+        # 1. 음악 존재 확인
+        music = get_object_or_404(Music, music_id=music_id)
+        
+        # 2. 해당 음악의 재생 로그 조회 (최신순)
+        play_logs = PlayLogs.objects.filter(music=music).order_by('-played_at')
+        
+        # 3. Serializer로 변환
+        serializer = PlayLogListItemSerializer(play_logs, many=True)
+        
+        # 4. 응답 반환
+        return Response(serializer.data, status=status.HTTP_200_OK)
