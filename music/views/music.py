@@ -1,5 +1,5 @@
 """
-음악 상세 관련 Views - iTunes ID 기반 상세 조회, 음악 재생
+음악 상세 관련 Views - iTunes ID 기반 상세 조회, 음악 재생, 태그 조회
 """
 from rest_framework import status
 from rest_framework.response import Response
@@ -9,8 +9,9 @@ from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
-from ..models import Music, Artists, Albums
+from ..models import Music, Artists, Albums, MusicTags
 from ..serializers import MusicDetailSerializer, MusicPlaySerializer
+from ..serializers.base import TagSerializer
 from ..services import iTunesService
 from ..tasks import fetch_artist_image_task, fetch_album_image_task, fetch_lyrics_task, save_itunes_track_to_db_task
 
@@ -281,3 +282,73 @@ class MusicPlayView(APIView):
         # 3. 음악 재생 정보 반환 (로그 저장 안 함)
         serializer = MusicPlaySerializer(music)
         return Response(serializer.data)
+
+
+class MusicTagsView(APIView):
+    """
+    음악 태그 조회
+    - GET: music_id로 음악에 연결된 태그 목록 조회
+    
+    GET /api/v1/tracks/{music_id}/tags
+    """
+    permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="음악 태그 조회",
+        description="""
+        music_id를 사용하여 해당 음악에 연결된 태그 목록을 조회합니다.
+        
+        **반환 정보:**
+        - tag_id: 태그 고유 ID
+        - tag_key: 태그 이름 (예: "신나는", "슬픈", "발라드" 등)
+        
+        **주의사항:**
+        - 삭제되지 않은 태그만 반환됩니다
+        - 태그가 없는 경우 빈 배열을 반환합니다
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='music_id',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description='음악 ID (DB의 music_id)',
+                required=True,
+                examples=[
+                    OpenApiExample(
+                        name='예시',
+                        value=1,
+                        description='음악 ID 예시'
+                    )
+                ]
+            )
+        ],
+        responses={
+            200: TagSerializer(many=True),
+            404: OpenApiResponse(description='Not Found - 음악을 찾을 수 없음'),
+        },
+        tags=['음악 상세']
+    )
+    def get(self, request, music_id):
+        """music_id로 태그 목록 조회"""
+        
+        # 1. 음악 존재 여부 확인
+        try:
+            music = Music.objects.get(music_id=music_id)
+        except Music.DoesNotExist:
+            return Response(
+                {'error': '음악을 찾을 수 없습니다.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # 2. 음악에 연결된 태그 조회
+        music_tags = MusicTags.objects.filter(
+            music=music,
+            is_deleted=False
+        ).select_related('tag')
+        
+        # 3. 삭제되지 않은 태그만 필터링
+        tags = [mt.tag for mt in music_tags if not mt.tag.is_deleted]
+        
+        # 4. 태그 목록 반환
+        serializer = TagSerializer(tags, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
