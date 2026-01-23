@@ -22,8 +22,6 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),  # OpenAPI 스키마 JSON
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),  # Swagger UI
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),  # ReDoc UI
-    # Prometheus 메트릭 엔드포인트 (django_prometheus는 /metrics 경로 사용)
-    path('', include('django_prometheus.urls')),  # /metrics 엔드포인트
 ]
 
 
