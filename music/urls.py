@@ -47,6 +47,13 @@ from .views import (
     UserLikedAlbumsView,
 )
 
+# OpenSearch 검색
+from .views.opensearch_search import (
+    OpenSearchMusicSearchView,
+    OpenSearchIndexManagementView,
+    OpenSearchSyncView,
+)
+
 # AI 음악 생성 (리팩토링된 CBV)
 from .views.ai_music import (
     AiMusicGenerateView,
@@ -84,6 +91,19 @@ urlpatterns = [
     # AI 음악 검색 (AI 음악 전용)
     # GET /api/music/search-ai/?q={검색어}
     path('search-ai/', AiMusicSearchView.as_view(), name='ai-music-search'),
+    
+    # OpenSearch 기반 검색
+    # GET /api/v1/search/opensearch?q={검색어}&sort_by={정렬}&exclude_ai={bool}
+    path('search/opensearch', OpenSearchMusicSearchView.as_view(), name='opensearch-search'),
+    
+    # OpenSearch 인덱스 관리
+    # POST /api/v1/search/opensearch/index - 인덱스 생성
+    # DELETE /api/v1/search/opensearch/index - 인덱스 삭제
+    path('search/opensearch/index', OpenSearchIndexManagementView.as_view(), name='opensearch-index-management'),
+    
+    # OpenSearch 동기화
+    # POST /api/v1/search/opensearch/sync - DB → OpenSearch 동기화
+    path('search/opensearch/sync', OpenSearchSyncView.as_view(), name='opensearch-sync'),
     
     # iTunes ID 기반 상세 조회 (DB에 없으면 자동 저장)
     # GET /api/v1/tracks/{itunes_id}
