@@ -86,8 +86,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        # django-prometheus를 사용하여 DB 쿼리 메트릭 수집
-        'ENGINE': os.getenv('SQL_ENGINE', 'django_prometheus.db.backends.postgresql'),
+        # 프로덕션 환경에서는 일반 PostgreSQL 엔진 사용 (안정성)
+        # 개발 환경에서만 django-prometheus 엔진 사용 (DB 쿼리 메트릭 수집)
+        'ENGINE': os.getenv('SQL_ENGINE', 'django.db.backends.postgresql' if not DEBUG else 'django_prometheus.db.backends.postgresql'),
         'NAME': os.getenv('SQL_DATABASE', 'music_db'),
         'USER': os.getenv('SQL_USER', 'music_user'),
         'PASSWORD': os.getenv('SQL_PASSWORD', 'music_password'),
@@ -484,6 +485,17 @@ AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
 AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', '')
 AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'ap-northeast-2')
 AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN', f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com')
+
+# ==============================================
+# AWS OpenSearch 설정
+# ==============================================
+OPENSEARCH_HOST = os.getenv('OPENSEARCH_HOST', '')
+OPENSEARCH_PORT = int(os.getenv('OPENSEARCH_PORT', '443'))
+OPENSEARCH_USERNAME = os.getenv('OPENSEARCH_USERNAME', 'admin')
+OPENSEARCH_PASSWORD = os.getenv('OPENSEARCH_PASSWORD', '')
+OPENSEARCH_USE_SSL = os.getenv('OPENSEARCH_USE_SSL', 'True') == 'True'
+OPENSEARCH_VERIFY_CERTS = os.getenv('OPENSEARCH_VERIFY_CERTS', 'True') == 'True'
+OPENSEARCH_INDEX_PREFIX = os.getenv('OPENSEARCH_INDEX_PREFIX', 'music')
 
 # S3 버킷이 설정된 경우에만 S3를 기본 스토리지로 사용
 # 단, DEBUG 모드에서는 로컬 정적 파일 스토리지 사용 (개발 편의성)

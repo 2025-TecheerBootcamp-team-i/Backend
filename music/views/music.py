@@ -10,9 +10,10 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
 from ..models import Music, Artists, Albums, MusicTags
-from ..serializers import MusicDetailSerializer, MusicPlaySerializer
+from ..serializers import MusicDetailSerializer, MusicPlaySerializer, MusicTagGraphSerializer
 from ..serializers.base import TagSerializer
 from ..services import iTunesService
+from ..services.internal.music_tag_service import MusicTagService
 from ..tasks import fetch_artist_image_task, fetch_album_image_task, fetch_lyrics_task, save_itunes_track_to_db_task
 
 
@@ -351,4 +352,63 @@ class MusicTagsView(APIView):
         
         # 4. 태그 목록 반환
         serializer = TagSerializer(tags, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class MusicTagGraphView(APIView):
+    """
+    음악 태그 그래프 데이터 조회 (Treemap용)
+    - GET: music_id로 태그별 score 및 비율(percentage) 조회
+    
+    GET /api/v1/tracks/{music_id}/tag-graph
+    """
+    permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="음악 태그 그래프 데이터 조회",
+        description="""
+        특정 음악의 태그 밀접도(score)를 분석하여 Recharts Treemap 형식으로 반환합니다.
+        
+        **반환 데이터:**
+        - name: "Tags" (루트 노드)
+        - children: 각 태그 정보 배열
+          - name: 태그명
+          - size: 밀접도 점수 (score)
+          - percentage: 전체 점수 중 차지하는 비율 (%)
+        
+        **특징:**
+        - 백엔드에서 점수 합계를 기반으로 정규화된 percentage를 계산하여 제공합니다.
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='music_id',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description='음악 ID',
+                required=True
+            )
+        ],
+        responses={
+            200: MusicTagGraphSerializer(many=True),
+            404: OpenApiResponse(description='Not Found - 음악을 찾을 수 없음'),
+        },
+        tags=['음악 상세']
+    )
+    def get(self, request, music_id):
+        """음악 태그 그래프 데이터 조회"""
+        
+        # 1. 음악 존재 여부 확인
+        try:
+            Music.objects.get(music_id=music_id)
+        except Music.DoesNotExist:
+            return Response(
+                {'error': '음악을 찾을 수 없습니다.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        # 2. 그래프 데이터 생성
+        graph_data = MusicTagService.get_tag_graph_data(music_id)
+        
+        # 3. 데이터 반환
+        serializer = MusicTagGraphSerializer(graph_data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
