@@ -171,7 +171,7 @@ def create_default_playlist(sender, instance, created, **kwargs):
             playlist = Playlists.objects.create(
                 user=user,
                 title="나의 좋아요 목록",
-                visibility="private",
+                visibility="system",
                 created_at=now,
                 updated_at=now,
                 is_deleted=False

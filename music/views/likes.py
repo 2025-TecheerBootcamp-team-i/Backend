@@ -57,11 +57,14 @@ class MusicLikeView(APIView):
                 is_new_like = True
             else:
                 # 이미 활성화된 좋아요가 있음
+                # 좋아요 개수 조회
+                like_count = MusicLikes.objects.filter(music=music).count()
                 return Response(
                     {
                         'message': '이미 좋아요를 누른 음악입니다.',
                         'music_id': music_id,
-                        'is_liked': True
+                        'is_liked': True,
+                        'like_count': like_count
                     },
                     status=status.HTTP_200_OK
                 )
@@ -79,22 +82,22 @@ class MusicLikeView(APIView):
                     visibility='system',
                     title='나의 좋아요 목록'
                 ).first()
-                
+
                 if system_playlist:
                     # 이미 플레이리스트에 추가되어 있는지 확인
                     existing_item = PlaylistItems.objects.filter(
                         playlist=system_playlist,
                         music=music
                     ).first()
-                    
+
                     if not existing_item:
                         # 마지막 순서 계산
                         last_item = PlaylistItems.objects.filter(
                             playlist=system_playlist
                         ).order_by('-order').first()
-                        
+
                         next_order = (last_item.order + 1) if last_item else 1
-                        
+
                         # 시스템 플레이리스트에 곡 추가
                         PlaylistItems.objects.create(
                             playlist=system_playlist,
@@ -108,11 +111,15 @@ class MusicLikeView(APIView):
                     f"시스템 플레이리스트 추가 실패: user_id={user.user_id}, "
                     f"music_id={music_id}, error={e}"
                 )
-        
+
+        # 좋아요 개수 조회
+        like_count = MusicLikes.objects.filter(music=music).count()
+
         serializer = MusicLikeSerializer({
             'message': '좋아요가 등록되었습니다.',
             'music_id': music_id,
-            'is_liked': True
+            'is_liked': True,
+            'like_count': like_count
         })
         
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -155,14 +162,14 @@ class MusicLikeView(APIView):
                     visibility='system',
                     title='나의 좋아요 목록'
                 ).first()
-                
+
                 if system_playlist:
                     # 플레이리스트에서 해당 곡 제거
                     playlist_item = PlaylistItems.objects.filter(
                         playlist=system_playlist,
                         music=music
                     ).first()
-                    
+
                     if playlist_item:
                         playlist_item.delete()
             except Exception as e:
@@ -172,21 +179,28 @@ class MusicLikeView(APIView):
                     f"시스템 플레이리스트 제거 실패: user_id={user.user_id}, "
                     f"music_id={music_id}, error={e}"
                 )
-            
+
+            # 좋아요 개수 조회
+            like_count = MusicLikes.objects.filter(music=music).count()
+
             serializer = MusicLikeSerializer({
                 'message': '좋아요가 취소되었습니다.',
                 'music_id': music_id,
-                'is_liked': False
+                'is_liked': False,
+                'like_count': like_count
             })
             
             return Response(serializer.data, status=status.HTTP_200_OK)
             
         except MusicLikes.DoesNotExist:
+            # 좋아요 개수 조회
+            like_count = MusicLikes.objects.filter(music=music).count()
             return Response(
                 {
                     'message': '좋아요를 누르지 않은 음악입니다.',
                     'music_id': music_id,
-                    'is_liked': False
+                    'is_liked': False,
+                    'like_count': like_count
                 },
                 status=status.HTTP_404_NOT_FOUND
             )
@@ -246,6 +260,43 @@ class UserLikedMusicListView(APIView):
                 'user_id': user_id,
                 'count': liked_musics.count(),
                 'results': serializer.data
+            },
+            status=status.HTTP_200_OK
+            )
+
+
+class TrackLikesCountView(APIView):
+    """
+    특정 음악의 전체 좋아요 수 조회 API
+
+    - GET: 특정 음악의 전체 좋아요 수 집계 조회
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="특정 음악의 좋아요 수 조회",
+        description="특정 음악의 전체 사용자들의 좋아요 수를 집계하여 반환합니다.",
+        tags=['좋아요']
+    )
+    def get(self, request, music_id):
+        """
+        특정 음악의 좋아요 수 조회
+        GET /api/v1/tracks/{music_id}/likes
+        """
+        # 음악 존재 확인 (SoftDeleteManager가 자동으로 is_deleted=False인 레코드만 조회)
+        music = get_object_or_404(Music, music_id=music_id)
+
+        # 해당 음악의 활성화된 좋아요 수 계산
+        like_count = MusicLikes.objects.filter(
+            music=music,
+            is_deleted=False
+        ).count()
+
+        return Response(
+            {
+                'music_id': music_id,
+                'like_count': like_count,
+                'message': f'음악 {music_id}의 좋아요 수를 조회했습니다.'
             },
             status=status.HTTP_200_OK
         )

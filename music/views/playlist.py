@@ -404,24 +404,31 @@ class PlaylistLikeView(APIView):
                 like.restore()
             else:
                 # 이미 활성화된 좋아요가 있음
+                # 좋아요 개수 조회
+                like_count = PlaylistLikes.objects.filter(playlist=playlist).count()
                 return Response(
                     {
                         'message': '이미 좋아요를 누른 플레이리스트입니다.',
                         'playlist_id': playlist_id,
-                        'is_liked': True
+                        'is_liked': True,
+                        'like_count': like_count
                     },
                     status=status.HTTP_200_OK
                 )
         else:
             # 새로운 좋아요 생성
             like = PlaylistLikes.objects.create(user=request.user, playlist=playlist)
-        
+
+        # 좋아요 개수 조회
+        like_count = PlaylistLikes.objects.filter(playlist=playlist).count()
+
         serializer = PlaylistLikeSerializer({
             'message': '좋아요가 등록되었습니다.',
             'playlist_id': playlist_id,
-            'is_liked': True
+            'is_liked': True,
+            'like_count': like_count
         })
-        
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def delete(self, request, playlist_id):
@@ -437,21 +444,28 @@ class PlaylistLikeView(APIView):
             like = PlaylistLikes.objects.get(user=request.user, playlist=playlist)
             # TrackableMixin의 delete() 메서드가 자동으로 Soft Delete 수행
             like.delete()
-            
+
+            # 좋아요 개수 조회
+            like_count = PlaylistLikes.objects.filter(playlist=playlist).count()
+
             serializer = PlaylistLikeSerializer({
                 'message': '좋아요가 취소되었습니다.',
                 'playlist_id': playlist_id,
-                'is_liked': False
+                'is_liked': False,
+                'like_count': like_count
             })
-            
+
             return Response(serializer.data, status=status.HTTP_200_OK)
             
         except PlaylistLikes.DoesNotExist:
+            # 좋아요 개수 조회
+            like_count = PlaylistLikes.objects.filter(playlist=playlist).count()
             return Response(
                 {
                     'message': '좋아요를 누르지 않은 플레이리스트입니다.',
                     'playlist_id': playlist_id,
-                    'is_liked': False
+                    'is_liked': False,
+                    'like_count': like_count
                 },
                 status=status.HTTP_404_NOT_FOUND
             )
