@@ -10,10 +10,12 @@ from .views import (
     EmailCheckView,
     TokenRefreshView,
     MusicLikeView,
+    TrackLikesCountView,
     UserLikedMusicListView,
     MusicSearchView,
     AiMusicSearchView,
     MusicDetailView as iTunesMusicDetailView,  # iTunes 기반 상세 조회 (기존)
+    MusicTagsView,  # 음악 태그 조회
     ArtistDetailView,
     ArtistTracksView,
     ArtistAlbumsView,
@@ -39,6 +41,10 @@ from .views import (
     PlaylistItemAddView,
     PlaylistItemDeleteView,
     PlaylistLikeView,
+    PlaylistLikedView,
+    # 앨범 좋아요
+    AlbumLikeView,
+    UserLikedAlbumsView,
 )
 
 # AI 음악 생성 (리팩토링된 CBV)
@@ -91,6 +97,10 @@ urlpatterns = [
     # 음악별 재생 로그 목록 조회
     # GET /api/v1/playlogs/{music_id}/ - 특정 음악의 재생 로그 조회
     path('playlogs/<int:music_id>/', MusicPlayLogsView.as_view(), name='music-playlogs'),
+    
+    # 음악 태그 조회
+    # GET /api/v1/tracks/{music_id}/tags - music_id로 태그 목록 조회
+    path('tracks/<int:music_id>/tags', MusicTagsView.as_view(), name='music-tags'),
 
     # 인기 아티스트 목록 조회
     # GET /api/v1/artists/popular?limit=7
@@ -112,11 +122,24 @@ urlpatterns = [
     # GET /api/v1/albums/{album_id}/
     path('albums/<int:album_id>/', AlbumDetailView.as_view(), name='album-detail'),
     
+    # 앨범 좋아요 등록/취소
+    # POST /api/v1/albums/{album_id}/likes
+    # DELETE /api/v1/albums/{album_id}/likes
+    path('albums/<int:album_id>/likes', AlbumLikeView.as_view(), name='album-like'),
+    
+    # 좋아요한 앨범 목록 조회
+    # GET /api/v1/albums/likes
+    path('albums/likes', UserLikedAlbumsView.as_view(), name='album-liked-list'),
+    
     # 좋아요 등록/취소 (POST, DELETE만 지원)
     # POST /api/v1/tracks/{music_id}/like
     # DELETE /api/v1/tracks/{music_id}/like
     path('tracks/<int:music_id>/like', MusicLikeView.as_view(), name='music-like'),
-    
+
+    # 특정 음악의 전체 좋아요 수 조회 (GET만 지원)
+    # GET /api/v1/tracks/{music_id}/likes
+    path('tracks/<int:music_id>/likes', TrackLikesCountView.as_view(), name='track-likes-count'),
+
     # 사용자가 좋아요한 곡 목록 조회 (GET만 지원)
     # GET /api/v1/users/{user_id}/likes
     path('users/<int:user_id>/likes', UserLikedMusicListView.as_view(), name='user-liked-music-list'),
@@ -151,7 +174,11 @@ urlpatterns = [
     # POST /api/v1/playlists/{playlistId}/likes   - 좋아요
     # DELETE /api/v1/playlists/{playlistId}/likes - 좋아요 취소
     path('playlists/<int:playlist_id>/likes', PlaylistLikeView.as_view(), name='playlist-like'),
-    
+
+    # 좋아요한 플레이리스트 목록 조회 (GET)
+    # GET /api/v1/playlists/likes - 좋아요한 플레이리스트 목록
+    path('playlists/likes', PlaylistLikedView.as_view(), name='playlist-liked'),
+
     # ========================
     # AI 음악 생성 API (리팩토링된 CBV)
     # ========================

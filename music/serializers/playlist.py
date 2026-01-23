@@ -17,16 +17,29 @@ class PlaylistItemSerializer(serializers.ModelSerializer):
 
 class PlaylistSerializer(serializers.ModelSerializer):
     """플레이리스트 목록 조회용 Serializer (기본 정보만)"""
-    creator_nickname = serializers.CharField(source='user.nickname', read_only=True)
+    user_id = serializers.SerializerMethodField()
+    creator_nickname = serializers.SerializerMethodField()
     item_count = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField()
-    
+    is_liked = serializers.SerializerMethodField()
+
     class Meta:
         model = Playlists
         fields = [
-            'playlist_id', 'title', 'visibility', 'creator_nickname',
-            'item_count', 'like_count', 'created_at', 'updated_at'
+            'playlist_id', 'title', 'visibility', 'user_id', 'creator_nickname',
+            'item_count', 'like_count', 'is_liked',
+            'created_at', 'updated_at', 
         ]
+    
+    def get_user_id(self, obj):
+        """플레이리스트 생성자 ID (안전하게 처리)"""
+        return obj.user.user_id if obj.user else None
+    
+    def get_creator_nickname(self, obj):
+        """플레이리스트 생성자 닉네임 (안전하게 처리)"""
+        if not obj.user:
+            return None
+        return obj.user.nickname if obj.user.nickname else f"User{obj.user.user_id}"
     
     def get_item_count(self, obj):
         """플레이리스트의 곡 개수"""
@@ -41,20 +54,40 @@ class PlaylistSerializer(serializers.ModelSerializer):
             playlist=obj,
             is_deleted=False
         ).count()
+    
+    def get_is_liked(self, obj):
+        """현재 사용자가 좋아요를 눌렀는지 여부"""
+        request = self.context.get('request')
+        if not request:
+            return False
+        
+        # 인증된 사용자 확인
+        user = request.user
+        if not user or not hasattr(user, 'is_authenticated') or not user.is_authenticated:
+            return False
+        
+        try:
+            return PlaylistLikes.objects.filter(
+                playlist=obj,
+                user=user,
+                is_deleted=False
+            ).exists()
+        except Exception:
+            return False
 
 
 class PlaylistDetailSerializer(serializers.ModelSerializer):
     """플레이리스트 상세 조회용 Serializer (곡 목록 포함)"""
-    creator_nickname = serializers.CharField(source='user.nickname', read_only=True)
+    user_id = serializers.IntegerField(source='user.user_id', read_only=True)
     items = serializers.SerializerMethodField()
     item_count = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField()
     is_liked = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Playlists
         fields = [
-            'playlist_id', 'title', 'visibility', 'creator_nickname',
+            'playlist_id', 'title', 'visibility', 'user_id',
             'items', 'item_count', 'like_count', 'is_liked',
             'created_at', 'updated_at'
         ]
@@ -116,7 +149,7 @@ class PlaylistCreateSerializer(serializers.ModelSerializer):
     
     def validate_visibility(self, value):
         """공개 범위 유효성 검사"""
-        valid_values = ['public', 'private']
+        valid_values = ['public', 'private', 'system']
         if value not in valid_values:
             raise serializers.ValidationError(
                 f"visibility는 {', '.join(valid_values)} 중 하나여야 합니다."
@@ -148,7 +181,7 @@ class PlaylistUpdateSerializer(serializers.ModelSerializer):
     def validate_visibility(self, value):
         """공개 범위 유효성 검사"""
         if value is not None:
-            valid_values = ['public', 'private']
+            valid_values = ['public', 'private', 'system']
             if value not in valid_values:
                 raise serializers.ValidationError(
                     f"visibility는 {', '.join(valid_values)} 중 하나여야 합니다."

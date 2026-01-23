@@ -3,7 +3,10 @@ server:
 
 metrics:
   global:
-    scrape_interval: 60s
+    scrape_interval: 15s
+    external_labels:
+      cluster: 'production'
+      environment: 'aws-ec2'
   wal_directory: /tmp/agent/wal
   configs:
     - name: default
@@ -12,26 +15,96 @@ metrics:
           basic_auth:
             username: 2926985
             password: ${GRAFANA_CLOUD_TOKEN}
-          
-          # ▼▼▼ [필승 해결책] 전송 직전에 모든 데이터의 이름을 강제로 덮어씌웁니다.
+          queue_config:
+            capacity: 10000
+            max_shards: 50
+            max_samples_per_send: 2000
+     
+          # 전송 직전 이름 강제 통일 (유지)
           write_relabel_configs:
             - target_label: instance
-              replacement: 'backend-server'  # 무조건 이 이름으로 변경!
+              replacement: 'backend-server'
               action: replace
-
+              
+      # Django 애플리케이션 메트릭 수집
       scrape_configs:
-        - job_name: agent
+        # 1. Grafana Agent 자체 메트릭
+        - job_name: 'grafana-agent'
           static_configs:
             - targets: ['localhost:12345']
+              labels:
+                instance: 'backend-server'
+                service: 'grafana-agent'
+        
+        # 2. Django Prometheus 메트릭 (Celery 메트릭 포함)
+        - job_name: 'django'
+          scrape_interval: 15s
+          static_configs:
+            - targets: ['backend:8000']
+              labels:
+                instance: 'backend-server'
+                service: 'django-backend'
+          metrics_path: '/metrics'
+        
+        # 3. cAdvisor (컨테이너 메트릭 - 상세 수집)
+        - job_name: 'cadvisor'
+          scrape_interval: 15s
+          static_configs:
+            - targets: ['cadvisor:8080']
+              labels:
+                instance: 'backend-server'
+                service: 'cadvisor'
+          metric_relabel_configs:
+            # 컨테이너 이름 추출
+            - source_labels: [name]
+              regex: '(.*)'
+              target_label: container_name
+              replacement: '$1'
+            # Docker 컨테이너만 유지
+            - source_labels: [id]
+              regex: '/docker/.*'
+              action: keep
+        
+        # 4. RabbitMQ 메트릭
+        - job_name: 'rabbitmq'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['rabbitmq:15692']
+              labels:
+                instance: 'backend-server'
+                service: 'rabbitmq'
+          metrics_path: '/metrics'
 
+# ===== 핵심: Node Exporter 통합 (서버 메트릭) =====
 integrations:
+  # Integration 메트릭을 Grafana Cloud로 전송
+  prometheus_remote_write:
+    - url: https://prometheus-prod-49-prod-ap-northeast-0.grafana.net/api/prom/push
+      basic_auth:
+        username: 2926985
+        password: ${GRAFANA_CLOUD_TOKEN}
+  
   node_exporter:
     enabled: true
-    # instance 설정을 지우고 위에서 일괄 처리합니다
+    # 인스턴스 라벨 (Grafana Cloud에서 식별)
+    instance: 'backend-server'
+    
+    # 호스트 파일시스템 경로 (Docker 볼륨 마운트와 일치)
     rootfs_path: /host/root
     sysfs_path: /host/sys
     procfs_path: /host/proc
-
-  cadvisor:
-    enabled: true
-    docker_only: true
+    
+    # 활성화할 수집기
+    enable_collectors:
+      - cpu
+      - meminfo
+      - diskstats
+      - filesystem
+      - netdev
+      - netstat
+      - loadavg
+      - time
+    
+    # 파일시스템 마운트 포인트 필터 (불필요한 항목 제외)
+    filesystem_mount_points_exclude: "^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)"
+    filesystem_fs_types_exclude: "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"

@@ -26,18 +26,22 @@ jobs:
 
   build:
     needs: detect-pr
-    # detect-pr에서 PR 번호를 찾았을 때만 실행
-    if: needs.detect-pr.outputs.pr_number != ''
+    # PR 머지 또는 직접 push 모두 배포 (PR 번호가 없어도 실행)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       # [최적화] API를 다시 호출하지 않고, 위에서 넘겨받은 값을 바로 사용하여 태그 생성
+      # PR 번호가 없으면 commit SHA의 앞 7자리 사용
       - name: Set Docker Image Tag
         id: set_tag
         run: |
           PR_NUMBER="${{ needs.detect-pr.outputs.pr_number }}"
-          DOCKER_IMAGE_TAG="1.0.${PR_NUMBER}"
+          if [ -n "$PR_NUMBER" ]; then
+            DOCKER_IMAGE_TAG="1.0.${PR_NUMBER}"
+          else
+            DOCKER_IMAGE_TAG="1.0.${GITHUB_SHA::7}"
+          fi
           echo "DOCKER_IMAGE_TAG=${DOCKER_IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
@@ -70,8 +74,30 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e  # 에러 발생 시 즉시 중단
+            
+            echo "===== [1/6] 프로젝트 디렉토리 이동 ====="
             cd /home/ubuntu/Backend
-            git pull origin main
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d --force-recreate
+            
+            echo "===== [2/6] 최신 코드 동기화 (로컬 변경사항 무시) ====="
+            git fetch origin main
+            git reset --hard origin/main
+            git clean -fd
+            
+            echo "===== [3/6] 기존 컨테이너 중지 및 제거 ====="
+            docker compose -f docker-compose.prod.yml down
+            
+            echo "===== [4/6] 캐시된 이미지 제거 (latest 태그) ====="
+            docker rmi ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:latest || echo "이미지 없음, 스킵"
+            
+            echo "===== [5/6] 최신 이미지 pull ====="
+            docker compose -f docker-compose.prod.yml pull --ignore-pull-failures
+            
+            echo "===== [6/6] 컨테이너 재시작 (강제 재생성) ====="
+            docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+            
+            echo "===== 배포 완료! 컨테이너 상태 확인 ====="
             docker compose -f docker-compose.prod.yml ps
+            
+            echo "===== 미사용 리소스 정리 (dangling 이미지) ====="
+            docker image prune -f

@@ -11,6 +11,7 @@ services:
   # 1. Django 백엔드
   backend:
     image: hhyuninu/2025_techeer_team_i:latest
+    container_name: backend
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
     env_file:
       - .env.production
@@ -41,11 +42,16 @@ services:
         limits:
           memory: 600M
 
-  # 2. RabbitMQ
+  # 2. RabbitMQ (Prometheus 메트릭 플러그인 활성화)
   rabbitmq:
     image: rabbitmq:3-management
     ports:
-      - "15672:15672"
+      - "15672:15672"  # Management UI
+      - "15692:15692"  # Prometheus metrics
+    volumes:
+      - ./monitoring/rabbitmq_enabled_plugins:/etc/rabbitmq/enabled_plugins
+    environment:
+      - RABBITMQ_PROMETHEUS_PLUGIN_ENABLED=true
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
@@ -148,24 +154,21 @@ services:
         limits:
           memory: 150M
 
-  # 8. Grafana Agent (메트릭 전송 - 최종 업그레이드)
-  grafana-agent:
-    image: grafana/agent:latest
+  # 8. cAdvisor (컨테이너 메트릭 수집)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg
     volumes:
-      - ./monitoring/agent-cloud.yml:/etc/agent/agent.yaml:ro
-      # ▼▼▼ [필수] 서버 내부 정보 읽기 권한
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/host/root:ro
-      # ▼▼▼ [필수] 도커 컨테이너 정보 읽기 권한
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: [
-      "-config.file=/etc/agent/agent.yaml",
-      "-config.expand-env",
-      "-metrics.wal-directory=/tmp/agent/wal"
-    ]
-    env_file:
-      - .env.production
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
@@ -175,6 +178,57 @@ services:
         limits:
           memory: 200M
 
+  # 9. Grafana Agent (메트릭 전송 - 완벽 설정)
+  grafana-agent:
+    image: grafana/agent:latest
+    container_name: grafana-agent
+    # ===== [중요] 호스트 메트릭 수집을 위한 권한 =====
+    privileged: true
+    pid: host
+    
+    volumes:
+      - ./monitoring/agent-cloud.yml:/etc/agent/agent.yaml:ro
+      # ▼▼▼ [필수] 서버 내부 정보 읽기 권한
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+      # ▼▼▼ [필수] 도커 컨테이너 정보 읽기 권한
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # WAL 디렉토리 (메트릭 버퍼)
+      - grafana-agent-data:/tmp/agent
+    
+    command: [
+      "-config.file=/etc/agent/agent.yaml",
+      "-config.expand-env=true",
+      "-server.http.address=0.0.0.0:12345"
+    ]
+    
+    ports:
+      - "12345:12345"  # Agent UI (선택사항, 디버깅용)
+    
+    env_file:
+      - .env.production
+    
+    environment:
+      - HOSTNAME=backend-server
+    
+    networks:
+      - ubuntu_gitops-network
+    
+    restart: unless-stopped
+    logging: *default-logging
+    
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
 networks:
   ubuntu_gitops-network:
     external: true
+
+volumes:
+  grafana-agent-data:
+    driver: local

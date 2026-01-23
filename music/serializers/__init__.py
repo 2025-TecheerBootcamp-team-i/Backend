@@ -24,6 +24,8 @@ from .music import (
     MusicLikeSerializer,
     MusicPlaySerializer,
     UserLikedMusicSerializer,
+    AlbumLikeSerializer,
+    UserLikedAlbumSerializer,
 )
 
 # 검색 관련 Serializers
@@ -98,6 +100,8 @@ __all__ = [
     'MusicLikeSerializer',
     'MusicPlaySerializer',
     'UserLikedMusicSerializer',
+    'AlbumLikeSerializer',
+    'UserLikedAlbumSerializer',
     # search
     'iTunesSearchResultSerializer',
     'AiMusicSearchResultSerializer',

@@ -22,13 +22,13 @@ from .auth import (
 )
 
 # 좋아요 관련 Views
-from .likes import MusicLikeView, UserLikedMusicListView
+from .likes import MusicLikeView, TrackLikesCountView, UserLikedMusicListView, AlbumLikeView, UserLikedAlbumsView
 
 # 검색 관련 Views
 from .search import MusicSearchView, AiMusicSearchView
 
 # 음악 상세 관련 Views
-from .music import MusicDetailView, MusicPlayView
+from .music import MusicDetailView, MusicPlayView, MusicTagsView
 
 # 아티스트 관련 Views
 from .artists import ArtistDetailView, ArtistTracksView, ArtistAlbumsView, AlbumDetailView, PopularArtistsView
@@ -57,6 +57,7 @@ from .playlist import (
     PlaylistItemAddView,
     PlaylistItemDeleteView,
     PlaylistLikeView,
+    PlaylistLikedView,
 )
 
 # AI 음악 생성 Views (리팩토링된 CBV)
@@ -85,13 +86,17 @@ __all__ = [
     'EmailCheckView',
     # likes
     'MusicLikeView',
+    'TrackLikesCountView',
     'UserLikedMusicListView',
+    'AlbumLikeView',
+    'UserLikedAlbumsView',
     # search
     'MusicSearchView',
     'AiMusicSearchView',
     # music
     'MusicDetailView',
     'MusicPlayView',
+    'MusicTagsView',
     # artists
     'ArtistDetailView',
     'ArtistTracksView',
@@ -118,6 +123,7 @@ __all__ = [
     'PlaylistItemAddView',
     'PlaylistItemDeleteView',
     'PlaylistLikeView',
+    'PlaylistLikedView',
     # legacy (함수 기반 - 템플릿 렌더링용)
     'music_generator_page',
     'music_list_page',

@@ -2,7 +2,7 @@
 음악 관련 Serializers - 음악 상세, 좋아요
 """
 from rest_framework import serializers
-from ..models import Music, MusicTags, AiInfo
+from ..models import Music, MusicTags, AiInfo, Albums, AlbumLikes
 from .base import ArtistSerializer, AlbumSerializer, TagSerializer, AiInfoSerializer
 
 
@@ -110,4 +110,68 @@ class UserLikedMusicSerializer(serializers.ModelSerializer):
             
             return original_url
         
+        return None
+
+
+class AlbumLikeSerializer(serializers.Serializer):
+    """앨범 좋아요 응답용 Serializer"""
+    message = serializers.CharField()
+    album_id = serializers.IntegerField()
+    is_liked = serializers.BooleanField()
+    like_count = serializers.IntegerField(required=False)
+
+
+class UserLikedAlbumSerializer(serializers.ModelSerializer):
+    """사용자가 좋아요한 앨범 목록용 Serializer"""
+    artist_name = serializers.CharField(source='artist.artist_name', read_only=True, allow_null=True)
+    cover_image = serializers.SerializerMethodField()
+    like_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    release_date = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Albums
+        fields = [
+            'album_id', 'album_name', 'artist_name', 
+            'cover_image', 'release_date',
+            'like_count', 'is_liked'
+        ]
+    
+    def get_cover_image(self, obj):
+        """앨범 커버 이미지 반환"""
+        if obj.image_square:
+            return obj.image_square
+        return obj.album_image
+    
+    def get_like_count(self, obj):
+        """앨범 좋아요 개수"""
+        return AlbumLikes.objects.filter(
+            album=obj,
+            is_deleted=False
+        ).count()
+    
+    def get_is_liked(self, obj):
+        """현재 사용자가 좋아요를 눌렀는지 여부"""
+        request = self.context.get('request')
+        if not request:
+            return False
+        
+        # 인증된 사용자 확인
+        user = request.user
+        if not user or not hasattr(user, 'is_authenticated') or not user.is_authenticated:
+            return False
+        
+        try:
+            return AlbumLikes.objects.filter(
+                album=obj,
+                user=user,
+                is_deleted=False
+            ).exists()
+        except Exception:
+            return False
+    
+    def get_release_date(self, obj):
+        """앨범 발매일 (created_at 사용)"""
+        if obj.created_at:
+            return obj.created_at.strftime('%Y-%m-%d')
         return None

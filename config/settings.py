@@ -267,6 +267,7 @@ else:
         'https://your-frontend-domain.vercel.app',  # Vercel 배포 도메인 (실제 도메인으로 변경 필요)
         'http://localhost:3000',  # React 개발 서버 (로컬 테스트용)
         'http://localhost:5173',  # Vite 개발 서버 (로컬 테스트용)
+        'http://localhost:4173', 
     ]
 
 # CORS 쿠키 및 인증 정보 전송 허용
@@ -501,4 +502,91 @@ else:
     # 개발 환경 또는 S3 미설정: 로컬 스토리지 사용
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+
+# ==============================================
+# 로깅 설정 (슬로우 쿼리 및 성능 추적)
+# ==============================================
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'slow_queries': {
+            'level': 'WARNING',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        # Django 기본 로거
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # 슬로우 쿼리 로깅 (0.5초 이상)
+        'django.db.backends': {
+            'handlers': ['slow_queries'],
+            'level': 'DEBUG' if DEBUG else 'WARNING',
+            'propagate': False,
+        },
+        # Celery 작업 로깅
+        'celery': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # music 앱 로깅
+        'music': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
+
+# 슬로우 쿼리 임계값 설정 (밀리초 단위)
+# 500ms 이상 걸리는 쿼리는 경고로 로깅
+if not DEBUG:
+    LOGGING['loggers']['django.db.backends']['level'] = 'DEBUG'
+    # 프로덕션에서는 슬로우 쿼리만 로깅
+    import logging
+    
+    class SlowQueryFilter(logging.Filter):
+        def filter(self, record):
+            # 500ms 이상 걸린 쿼리만 로깅
+            if hasattr(record, 'duration'):
+                return record.duration > 0.5
+            return True
+    
+    LOGGING['filters']['slow_query_filter'] = {
+        '()': SlowQueryFilter,
+    }
+    LOGGING['handlers']['slow_queries']['filters'] = ['slow_query_filter']
 
