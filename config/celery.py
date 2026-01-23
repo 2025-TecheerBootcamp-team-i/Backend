@@ -1,8 +1,7 @@
 import os
 from celery import Celery
 from celery.signals import task_prerun, task_postrun, task_failure
-from prometheus_client import Counter, Histogram, Gauge
-from django_prometheus.conf import REGISTRY
+from prometheus_client import Counter, Histogram, Gauge, REGISTRY
 import time
 
 # Django의 settings 모듈을 Celery에 기본값으로 설정합니다.
