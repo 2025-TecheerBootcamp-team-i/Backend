@@ -10,6 +10,7 @@ from .views import (
     EmailCheckView,
     TokenRefreshView,
     MusicLikeView,
+    TrackLikesCountView,
     UserLikedMusicListView,
     MusicSearchView,
     AiMusicSearchView,
@@ -129,7 +130,11 @@ urlpatterns = [
     # POST /api/v1/tracks/{music_id}/like
     # DELETE /api/v1/tracks/{music_id}/like
     path('tracks/<int:music_id>/like', MusicLikeView.as_view(), name='music-like'),
-    
+
+    # 특정 음악의 전체 좋아요 수 조회 (GET만 지원)
+    # GET /api/v1/tracks/{music_id}/likes
+    path('tracks/<int:music_id>/likes', TrackLikesCountView.as_view(), name='track-likes-count'),
+
     # 사용자가 좋아요한 곡 목록 조회 (GET만 지원)
     # GET /api/v1/users/{user_id}/likes
     path('users/<int:user_id>/likes', UserLikedMusicListView.as_view(), name='user-liked-music-list'),
