@@ -66,6 +66,19 @@ class MusicPlaySerializer(serializers.ModelSerializer):
         ]
 
 
+class TagGraphItemSerializer(serializers.Serializer):
+    """트리맵 항목용 시리얼라이저 (태그 개별 항목)"""
+    name = serializers.CharField(source='tag.tag_key')
+    size = serializers.FloatField(source='score')
+    percentage = serializers.FloatField()
+
+
+class MusicTagGraphSerializer(serializers.Serializer):
+    """음악 태그 트리맵용 시리얼라이저 (Recharts 호환)"""
+    name = serializers.CharField()
+    children = TagGraphItemSerializer(many=True)
+
+
 class UserLikedMusicSerializer(serializers.ModelSerializer):
     """사용자가 좋아요한 곡 목록용 Serializer"""
     artist_name = serializers.CharField(source='artist.artist_name', read_only=True, allow_null=True)

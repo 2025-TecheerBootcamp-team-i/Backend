@@ -26,6 +26,7 @@ from .music import (
     UserLikedMusicSerializer,
     AlbumLikeSerializer,
     UserLikedAlbumSerializer,
+    MusicTagGraphSerializer,
 )
 
 # 검색 관련 Serializers
@@ -102,6 +103,7 @@ __all__ = [
     'UserLikedMusicSerializer',
     'AlbumLikeSerializer',
     'UserLikedAlbumSerializer',
+    'MusicTagGraphSerializer',
     # search
     'iTunesSearchResultSerializer',
     'AiMusicSearchResultSerializer',

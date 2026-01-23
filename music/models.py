@@ -330,7 +330,8 @@ class MusicLikes(TrackableMixin, models.Model):
 
 class MusicTags(TrackableMixin, models.Model):
     tag = models.ForeignKey('Tags', models.DO_NOTHING)
-    music = models.OneToOneField(Music, models.DO_NOTHING, primary_key=True)  # The composite primary key (music_id, tag_id) found, that is not supported. The first column is selected.
+    music = models.ForeignKey(Music, models.DO_NOTHING, primary_key=True) # 다시 music을 primary_key로 설정 (DB 컬럼명 music_id)
+    score = models.FloatField(default=0.0, blank=True, null=True) # 태그 밀접도 점수 추가
     # created_at, updated_at, is_deleted는 TrackableMixin에서 제공
 
     objects = SoftDeleteManager()  # 삭제되지 않은 레코드만 조회
