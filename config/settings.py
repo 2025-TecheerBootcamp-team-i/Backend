@@ -86,8 +86,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        # django-prometheus를 사용하여 DB 쿼리 메트릭 수집
-        'ENGINE': os.getenv('SQL_ENGINE', 'django_prometheus.db.backends.postgresql'),
+        # 프로덕션 환경에서는 일반 PostgreSQL 엔진 사용 (안정성)
+        # 개발 환경에서만 django-prometheus 엔진 사용 (DB 쿼리 메트릭 수집)
+        'ENGINE': os.getenv('SQL_ENGINE', 'django.db.backends.postgresql' if not DEBUG else 'django_prometheus.db.backends.postgresql'),
         'NAME': os.getenv('SQL_DATABASE', 'music_db'),
         'USER': os.getenv('SQL_USER', 'music_user'),
         'PASSWORD': os.getenv('SQL_PASSWORD', 'music_password'),
