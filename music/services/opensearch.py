@@ -142,6 +142,16 @@ class OpenSearchService:
                     "duration": {"type": "integer"},
                     "is_ai": {"type": "boolean"},
                     "tags": {"type": "keyword"},
+                    "lyrics": {
+                        "type": "text",
+                        "analyzer": "korean_analyzer",
+                        "fields": {
+                            "ngram": {
+                                "type": "text",
+                                "analyzer": "ngram_analyzer"
+                            }
+                        }
+                    },
                     "created_at": {"type": "date"},
                     "play_count": {"type": "integer"},
                     "like_count": {"type": "integer"}
@@ -341,7 +351,11 @@ class OpenSearchService:
                 "fields": {
                     "music_name": {},
                     "artist_name": {},
-                    "album_name": {}
+                    "album_name": {},
+                    "lyrics": {
+                        "fragment_size": 150,  # 가사는 150자까지만 표시
+                        "number_of_fragments": 3  # 최대 3개 조각
+                    }
                 }
             }
             
@@ -402,10 +416,12 @@ class OpenSearchService:
                 "multi_match": {
                     "query": query,
                     "fields": [
-                        "music_name^3",           # 곡명에 가중치 3
-                        "music_name.ngram^2",     # 곡명 ngram에 가중치 2
-                        "artist_name^2",          # 아티스트명에 가중치 2
-                        "artist_name.ngram",      # 아티스트명 ngram
+                        "music_name^4",           # 곡명에 가중치 4
+                        "music_name.ngram^3",     # 곡명 ngram에 가중치 3
+                        "artist_name^3",          # 아티스트명에 가중치 3
+                        "artist_name.ngram^2",    # 아티스트명 ngram에 가중치 2
+                        "lyrics^2",               # 가사에 가중치 2
+                        "lyrics.ngram",           # 가사 ngram
                         "album_name",             # 앨범명
                         "album_name.ngram"        # 앨범명 ngram
                     ],

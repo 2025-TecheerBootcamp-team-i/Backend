@@ -22,8 +22,8 @@ OpenSearch 검색 시스템은 다음과 같은 특징을 가집니다:
 # AWS OpenSearch 설정
 OPENSEARCH_HOST=your-opensearch-domain.region.es.amazonaws.com
 OPENSEARCH_PORT=443
-OPENSEARCH_USERNAME=techeer
-OPENSEARCH_PASSWORD=Techeer1!
+OPENSEARCH_USERNAME=admin
+OPENSEARCH_PASSWORD=your-password
 OPENSEARCH_USE_SSL=True
 OPENSEARCH_VERIFY_CERTS=True
 OPENSEARCH_INDEX_PREFIX=music
@@ -162,28 +162,51 @@ const data = await response.json();
 
 OpenSearch는 다음 필드를 검색합니다:
 
-- **곡명** (가중치: 3) - 가장 높은 우선순위
-- **아티스트명** (가중치: 2) - 중간 우선순위
+- **곡명** (가중치: 4) - 가장 높은 우선순위
+- **아티스트명** (가중치: 3) - 높은 우선순위
+- **가사** (가중치: 2) - 중간 우선순위
 - **앨범명** (가중치: 1) - 낮은 우선순위
 
-### 2. Ngram 기반 부분 일치
+### 2. 가사 검색 (Lyrics Search) 🎤
+
+가사 내용으로도 노래를 찾을 수 있습니다:
+
+**예시:**
+```bash
+# 가사에 "너를 만난 그날부터"가 포함된 곡 검색
+GET /api/v1/search/opensearch?q=너를 만난 그날부터
+
+# 가사에 "하늘을 나는"이 포함된 곡 검색
+GET /api/v1/search/opensearch?q=하늘을 나는
+```
+
+**특징:**
+- 가사의 일부분만 기억해도 검색 가능
+- 하이라이트 기능으로 매칭된 가사 부분 강조
+
+### 3. Ngram 기반 부분 일치
 
 부분 문자열로도 검색 가능:
 
 - "분홍" → "분홍신" 검색됨
 - "아이" → "아이유" 검색됨
+- "하늘" → "하늘을 나는 꿈" 가사 검색됨
 
-### 3. 퍼지 매칭 (오타 허용)
+### 4. 퍼지 매칭 (오타 허용)
 
 1-2글자 오타도 허용:
 
 - "아유" → "아이유" 검색됨
 - "분홍시" → "분홍신" 검색됨
+- "사랑해요" → "사랑행요" 검색됨
 
-### 4. 정렬 옵션
+### 5. 정렬 옵션
 
 #### `relevance` (기본값)
 검색 관련도 순으로 정렬 (검색어와 가장 관련성 높은 결과 우선)
+
+**가중치 계산:**
+- 곡명 일치 > 아티스트명 일치 > 가사 일치 > 앨범명 일치
 
 #### `popularity`
 인기도 순으로 정렬:
@@ -224,6 +247,7 @@ def index_music_on_save(sender, instance, **kwargs):
         'duration': instance.duration or 0,
         'is_ai': getattr(instance, 'is_ai', False),
         'tags': [],  # 태그 추출 로직 추가
+        'lyrics': instance.lyrics or '',  # 가사 추가
         'created_at': instance.created_at.isoformat() if instance.created_at else None,
         'play_count': 0,
         'like_count': 0,
@@ -251,6 +275,29 @@ OpenSearch 인덱스는 다음과 같은 매핑을 사용합니다:
 
 ```json
 {
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "korean_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "trim"]
+        },
+        "ngram_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "ngram_filter"]
+        }
+      },
+      "filter": {
+        "ngram_filter": {
+          "type": "ngram",
+          "min_gram": 2,
+          "max_gram": 10
+        }
+      }
+    }
+  },
   "mappings": {
     "properties": {
       "music_id": {"type": "integer"},
@@ -272,6 +319,13 @@ OpenSearch 인덱스는 다음과 같은 매핑을 사용합니다:
         }
       },
       "album_name": {
+        "type": "text",
+        "analyzer": "korean_analyzer",
+        "fields": {
+          "ngram": {"type": "text", "analyzer": "ngram_analyzer"}
+        }
+      },
+      "lyrics": {
         "type": "text",
         "analyzer": "korean_analyzer",
         "fields": {
@@ -325,13 +379,15 @@ OpenSearch 인덱스는 다음과 같은 매핑을 사용합니다:
 | 부분 일치 | 제한적 | ✅ |
 | 정렬 옵션 | 제한적 | 다양함 |
 | 한글 지원 | 제한적 | 최적화됨 |
+| 가사 검색 | ❌ | ✅ |
 | 태그 검색 | ✅ | ✅ (예정) |
 
 ## 📈 향후 개선 사항
 
+- [x] 가사 검색 (Lyrics Search) ✅
+- [ ] 유의어 검색 (아티스트 별명/본명 매칭)
 - [ ] 자동완성 (Autocomplete) 기능 추가
 - [ ] 태그 기반 검색 통합
 - [ ] 검색 로그 분석 및 인기 검색어 추천
 - [ ] 재생 수/좋아요 수 실시간 업데이트
-- [ ] 동의어 사전 (Synonym Dictionary) 구축
 - [ ] 검색 결과 개인화 (Personalization)

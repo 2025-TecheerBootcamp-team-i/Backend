@@ -326,6 +326,7 @@ class OpenSearchSyncView(APIView):
                     'duration': music.duration or 0,
                     'is_ai': getattr(music, 'is_ai', False),
                     'tags': tags,
+                    'lyrics': music.lyrics or '',  # 가사 추가
                     'created_at': music.created_at.isoformat() if music.created_at else None,
                     'play_count': 0,  # TODO: 재생 수 통계 추가
                     'like_count': 0,  # TODO: 좋아요 수 통계 추가
