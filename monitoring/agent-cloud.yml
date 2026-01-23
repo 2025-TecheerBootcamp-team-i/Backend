@@ -36,8 +36,9 @@ metrics:
                 instance: 'backend-server'
                 service: 'grafana-agent'
         
-        # 2. Django Prometheus 메트릭
+        # 2. Django Prometheus 메트릭 (Celery 메트릭 포함)
         - job_name: 'django'
+          scrape_interval: 15s
           static_configs:
             - targets: ['backend:8000']
               labels:
@@ -45,23 +46,34 @@ metrics:
                 service: 'django-backend'
           metrics_path: '/metrics'
         
-        # 3. cAdvisor (컨테이너 메트릭)
+        # 3. cAdvisor (컨테이너 메트릭 - 상세 수집)
         - job_name: 'cadvisor'
+          scrape_interval: 15s
           static_configs:
             - targets: ['cadvisor:8080']
               labels:
                 instance: 'backend-server'
                 service: 'cadvisor'
           metric_relabel_configs:
-            # id에서 컨테이너 ID 추출 (docker-<container_id>.scope)
-            - source_labels: [id]
-              regex: '.*/docker-([0-9a-f]+)\.scope'
-              target_label: container_id
+            # 컨테이너 이름 추출
+            - source_labels: [name]
+              regex: '(.*)'
+              target_label: container_name
               replacement: '$1'
-            # Docker 컨테이너만 필터링
+            # Docker 컨테이너만 유지
             - source_labels: [id]
-              regex: '/system\.slice/docker-.*'
+              regex: '/docker/.*'
               action: keep
+        
+        # 4. RabbitMQ 메트릭
+        - job_name: 'rabbitmq'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['rabbitmq:15692']
+              labels:
+                instance: 'backend-server'
+                service: 'rabbitmq'
+          metrics_path: '/metrics'
 
 # ===== 핵심: Node Exporter 통합 (서버 메트릭) =====
 integrations:
