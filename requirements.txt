@@ -48,6 +48,13 @@ python-dotenv                       # .env 파일에서 환경 변수 로드
 gunicorn                            # WSGI HTTP 서버 (프로덕션 배포용)
 
 # ==============================================
+# 모니터링
+# ==============================================
+django-prometheus                   # Django 메트릭 노출 (Prometheus 연동)
+celery-prometheus-exporter          # Celery 작업별 메트릭 노출
+prometheus-client                   # Prometheus 메트릭 라이브러리
+
+# ==============================================
 # API 문서화
 # ==============================================
 drf-spectacular>=0.27.0,<0.28.0     # Swagger/OpenAPI 문서 자동 생성
