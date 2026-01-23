@@ -16,6 +16,7 @@ from .views import (
     AiMusicSearchView,
     MusicDetailView as iTunesMusicDetailView,  # iTunes 기반 상세 조회 (기존)
     MusicTagsView,  # 음악 태그 조회
+    MusicTagGraphView, # 음악 태그 그래프 조회
     ArtistDetailView,
     ArtistTracksView,
     ArtistAlbumsView,
@@ -101,6 +102,10 @@ urlpatterns = [
     # 음악 태그 조회
     # GET /api/v1/tracks/{music_id}/tags - music_id로 태그 목록 조회
     path('tracks/<int:music_id>/tags', MusicTagsView.as_view(), name='music-tags'),
+
+    # 음악 태그 그래프 데이터 조회 (Treemap)
+    # GET /api/v1/tracks/{music_id}/tag-graph
+    path('tracks/<int:music_id>/tag-graph', MusicTagGraphView.as_view(), name='music-tag-graph'),
 
     # 인기 아티스트 목록 조회
     # GET /api/v1/artists/popular?limit=7
