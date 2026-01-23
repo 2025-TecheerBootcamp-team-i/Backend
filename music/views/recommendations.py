@@ -2,6 +2,7 @@
 음악 추천 관련 Views
 """
 import random
+import math
 from collections import defaultdict
 from rest_framework import status
 from rest_framework.response import Response
@@ -18,25 +19,20 @@ class MusicRecommendationView(APIView):
     """
     음악 추천 API
     
-    GET /api/v1/recommendations/?type=tag|genre|emotion&music_id={music_id}&limit=10
+    GET /api/v1/recommendations/?music_id={music_id}&limit=10
+    태그, 장르, 감정 3가지 요소를 모두 고려하여 추천합니다.
     """
     
     @extend_schema(
         summary="음악 추천",
         description="""
-        3가지 방식으로 음악을 추천합니다:
-        1. tag: 태그 기반 추천 (현재 곡과 같은 태그를 가진 곡)
-        2. genre: 장르 기반 추천 (현재 곡과 같은 장르의 곡)
-        3. emotion: arousal-valence 기반 추천 (유사한 감정 특성의 곡)
+        태그, 장르, 감정 3가지 요소를 모두 고려하여 음악을 추천합니다:
+        1. 태그: 공통 태그 개수에 따라 점수 부여
+        2. 장르: 같은 장르면 점수 부여
+        3. 감정: arousal-valence 거리에 따라 점수 부여
+        각 요소의 점수를 합산하여 최종 추천 곡을 선정합니다.
         """,
         parameters=[
-            OpenApiParameter(
-                name='type',
-                type=OpenApiTypes.STR,
-                location=OpenApiParameter.QUERY,
-                description='추천 방식 (tag|genre|emotion)',
-                required=True,
-            ),
             OpenApiParameter(
                 name='music_id',
                 type=OpenApiTypes.INT,
@@ -55,13 +51,12 @@ class MusicRecommendationView(APIView):
         tags=['음악 추천']
     )
     def get(self, request):
-        rec_type = request.query_params.get('type')
         music_id = request.query_params.get('music_id')
         limit = int(request.query_params.get('limit', 10))
         
-        if not rec_type or not music_id:
+        if not music_id:
             return Response(
-                {'error': 'type과 music_id 파라미터가 필요합니다.'},
+                {'error': 'music_id 파라미터가 필요합니다.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -73,25 +68,204 @@ class MusicRecommendationView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        if rec_type == 'tag':
-            recommended = self._recommend_by_tags(base_music, limit)
-        elif rec_type == 'genre':
-            recommended = self._recommend_by_genre(base_music, limit)
-        elif rec_type == 'emotion':
-            recommended = self._recommend_by_emotion(base_music, limit)
-        else:
-            return Response(
-                {'error': 'type은 tag, genre, emotion 중 하나여야 합니다.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # 3가지 요소를 모두 고려한 통합 추천
+        recommended_with_scores = self._recommend_combined(base_music, limit)
         
-        serializer = MusicDetailSerializer(recommended, many=True)
+        # 점수 정보와 함께 응답 구성
+        results = []
+        for item in recommended_with_scores:
+            music = item['music']
+            serializer = MusicDetailSerializer(music)
+            music_data = serializer.data
+            music_data['scores'] = {
+                'tag_score': round(item['tag_score'], 2),
+                'genre_score': round(item['genre_score'], 2),
+                'emotion_score': round(item['emotion_score'], 2),
+                'total_score': round(item['total_score'], 2)
+            }
+            results.append(music_data)
+        
         return Response({
-            'type': rec_type,
             'base_music_id': music_id,
-            'count': len(recommended),
-            'results': serializer.data
+            'count': len(results),
+            'results': results
         })
+    
+    def _recommend_combined(self, base_music, limit):
+        """태그, 장르, 감정 3가지 요소를 모두 고려한 통합 추천"""
+        # 후보 곡들을 가져오기 (충분히 많이)
+        candidate_limit = limit * 5
+        
+        # 1. 태그 기반 후보 가져오기
+        tag_candidates = self._get_tag_candidates(base_music, candidate_limit)
+        
+        # 2. 장르 기반 후보 가져오기
+        genre_candidates = self._get_genre_candidates(base_music, candidate_limit)
+        
+        # 3. 감정 기반 후보 가져오기
+        emotion_candidates = self._get_emotion_candidates(base_music, candidate_limit)
+        
+        # 모든 후보를 합치기 (music_id 기준으로 중복 제거)
+        all_candidates = {}
+        for music in tag_candidates + genre_candidates + emotion_candidates:
+            if music.music_id not in all_candidates:
+                all_candidates[music.music_id] = music
+        
+        if not all_candidates:
+            return []
+        
+        # 각 곡에 대해 점수 계산
+        base_tags = set(MusicTags.objects.filter(
+            music=base_music,
+            is_deleted=False
+        ).values_list('tag__tag_id', flat=True))
+        
+        base_valence = float(base_music.valence) if base_music.valence is not None else None
+        base_arousal = float(base_music.arousal) if base_music.arousal is not None else None
+        
+        scored_music = []
+        for music_id, music in all_candidates.items():
+            tag_score = 0.0
+            genre_score = 0.0
+            emotion_score = 0.0
+            
+            # 태그 점수 계산 (공통 태그 개수, 최대 30점)
+            if base_tags:
+                music_tags = set(MusicTags.objects.filter(
+                    music=music,
+                    is_deleted=False
+                ).values_list('tag__tag_id', flat=True))
+                common_tags = base_tags & music_tags
+                # 태그당 점수를 낮추고 최대 30점으로 제한
+                tag_score = min(len(common_tags) * 5.0, 30.0)  # 태그당 5점, 최대 30점
+            
+            # 장르 점수 계산 (같은 장르면 점수 부여)
+            if base_music.genre and music.genre and base_music.genre == music.genre:
+                genre_score = 10.0  # 같은 장르면 10점
+            
+            # 감정 점수 계산 (거리가 가까울수록 높은 점수)
+            if base_valence is not None and base_arousal is not None:
+                if music.valence is not None and music.arousal is not None:
+                    distance = math.sqrt(
+                        (float(music.valence) - base_valence) ** 2 +
+                        (float(music.arousal) - base_arousal) ** 2
+                    )
+                    # 거리가 0이면 20점, 거리가 멀수록 점수 감소 (최대 거리 4.0 기준)
+                    if distance < 4.0:
+                        emotion_score = max(0, 20.0 * (1 - distance / 4.0))
+            
+            total_score = tag_score + genre_score + emotion_score
+            
+            scored_music.append({
+                'music': music,
+                'tag_score': tag_score,
+                'genre_score': genre_score,
+                'emotion_score': emotion_score,
+                'total_score': total_score
+            })
+        
+        # 점수 순으로 정렬 (내림차순)
+        scored_music.sort(key=lambda x: x['total_score'], reverse=True)
+        
+        # 점수가 같은 경우 랜덤으로 섞기
+        # 점수별로 그룹화
+        score_groups = defaultdict(list)
+        for item in scored_music:
+            score_groups[round(item['total_score'], 2)].append(item)
+        
+        # 점수가 높은 순서대로, 같은 점수 내에서는 랜덤으로 선택
+        final_recommended = []
+        for score in sorted(score_groups.keys(), reverse=True):
+            group_items = score_groups[score]
+            random.shuffle(group_items)
+            final_recommended.extend(group_items)
+            if len(final_recommended) >= limit:
+                break
+        
+        return final_recommended[:limit]
+    
+    def _get_tag_candidates(self, base_music, limit):
+        """태그 기반 후보 곡들 가져오기"""
+        base_tags = MusicTags.objects.filter(
+            music=base_music,
+            is_deleted=False
+        ).values_list('tag__tag_id', flat=True)
+        
+        if not base_tags:
+            return []
+        
+        similar_music_ids = MusicTags.objects.filter(
+            tag__tag_id__in=base_tags,
+            is_deleted=False
+        ).exclude(
+            music=base_music
+        ).values('music_id').annotate(
+            tag_count=Count('tag_id')
+        ).order_by('-tag_count')[:limit]
+        
+        music_ids = [item['music_id'] for item in similar_music_ids]
+        
+        candidates = []
+        seen = set()
+        for music_id in music_ids:
+            if music_id not in seen:
+                try:
+                    music = Music.objects.select_related('artist', 'album').get(
+                        music_id=music_id,
+                        is_deleted=False
+                    )
+                    candidates.append(music)
+                    seen.add(music_id)
+                except Music.DoesNotExist:
+                    continue
+        
+        return candidates
+    
+    def _get_genre_candidates(self, base_music, limit):
+        """장르 기반 후보 곡들 가져오기"""
+        if not base_music.genre:
+            return []
+        
+        candidates = list(Music.objects.filter(
+            genre=base_music.genre,
+            is_deleted=False
+        ).exclude(
+            music_id=base_music.music_id
+        ).select_related('artist', 'album').order_by('?')[:limit])
+        
+        return candidates
+    
+    def _get_emotion_candidates(self, base_music, limit):
+        """감정 기반 후보 곡들 가져오기"""
+        if base_music.valence is None or base_music.arousal is None:
+            return []
+        
+        base_valence = float(base_music.valence)
+        base_arousal = float(base_music.arousal)
+        
+        candidates = list(Music.objects.filter(
+            is_deleted=False,
+            valence__isnull=False,
+            arousal__isnull=False
+        ).exclude(
+            music_id=base_music.music_id
+        ).extra(
+            select={
+                'distance': f"""
+                    POWER(CAST(valence AS DECIMAL) - {base_valence}, 2) + 
+                    POWER(CAST(arousal AS DECIMAL) - {base_arousal}, 2)
+                """
+            },
+            where=[
+                f"""
+                POWER(CAST(valence AS DECIMAL) - {base_valence}, 2) + 
+                POWER(CAST(arousal AS DECIMAL) - {base_arousal}, 2) < 4.0
+                """
+            ],
+            order_by=['distance']
+        ).select_related('artist', 'album')[:limit])
+        
+        return candidates
     
     def _recommend_by_tags(self, base_music, limit):
         """태그 기반 추천"""
