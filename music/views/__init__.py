@@ -73,6 +73,9 @@ from .ai_music import (
     ConvertPromptView,
 )
 
+# 음악 추천 관련 Views
+from .recommendations import MusicRecommendationView
+
 # 외부에서 사용 가능한 모든 클래스 및 함수
 __all__ = [
     # common
@@ -138,4 +141,6 @@ __all__ = [
     'SunoTaskStatusView',
     'SunoWebhookView',
     'ConvertPromptView',
+    # recommendations
+    'MusicRecommendationView',
 ]
