@@ -20,6 +20,9 @@ from .external.lyrics_ovh import LyricsOvhService
 from .internal.ai_music_service import AiMusicGenerationService
 from .internal.user_statistics import UserStatisticsService
 
+# 검색 엔진
+from .opensearch import opensearch_service
+
 __all__ = [
     # 외부 API 서비스들
     'iTunesService',
@@ -31,4 +34,7 @@ __all__ = [
     # 내부 비즈니스 로직
     'AiMusicGenerationService',  # AI 음악 생성
     'UserStatisticsService',     # 사용자 음악 통계
+    
+    # 검색 엔진
+    'opensearch_service',        # AWS OpenSearch 검색
 ]
