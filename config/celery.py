@@ -2,6 +2,7 @@ import os
 from celery import Celery
 from celery.signals import task_prerun, task_postrun, task_failure
 from prometheus_client import Counter, Histogram, Gauge
+from django_prometheus.conf import REGISTRY
 import time
 
 # Django의 settings 모듈을 Celery에 기본값으로 설정합니다.
@@ -24,7 +25,8 @@ app.autodiscover_tasks()
 celery_tasks_total = Counter(
     'celery_tasks_total',
     'Total number of tasks executed',
-    ['task_name', 'status']
+    ['task_name', 'status'],
+    registry=REGISTRY
 )
 
 # Celery 작업 실행 시간
@@ -32,14 +34,16 @@ celery_task_duration = Histogram(
     'celery_task_duration_seconds',
     'Task execution time in seconds',
     ['task_name'],
-    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, float('inf')]
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, float('inf')],
+    registry=REGISTRY
 )
 
 # 현재 실행 중인 Celery 작업 수
 celery_tasks_running = Gauge(
     'celery_tasks_running',
     'Number of tasks currently running',
-    ['task_name']
+    ['task_name'],
+    registry=REGISTRY
 )
 
 # 작업 실행 시간 추적을 위한 임시 저장소
