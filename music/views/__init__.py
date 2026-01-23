@@ -28,7 +28,7 @@ from .likes import MusicLikeView, UserLikedMusicListView, AlbumLikeView, UserLik
 from .search import MusicSearchView, AiMusicSearchView
 
 # 음악 상세 관련 Views
-from .music import MusicDetailView, MusicPlayView
+from .music import MusicDetailView, MusicPlayView, MusicTagsView
 
 # 아티스트 관련 Views
 from .artists import ArtistDetailView, ArtistTracksView, ArtistAlbumsView, AlbumDetailView, PopularArtistsView
@@ -95,6 +95,7 @@ __all__ = [
     # music
     'MusicDetailView',
     'MusicPlayView',
+    'MusicTagsView',
     # artists
     'ArtistDetailView',
     'ArtistTracksView',
