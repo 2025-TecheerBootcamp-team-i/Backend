@@ -9,6 +9,8 @@ OpenSearch 검색 시스템은 다음과 같은 특징을 가집니다:
 - **전문 검색**: 빠르고 정확한 Full-text Search
 - **한글 지원**: 한글 형태소 분석 및 ngram 기반 부분 일치
 - **퍼지 매칭**: 오타 허용 검색
+- **동의어 검색**: 아티스트 별명/본명 자동 매칭 (예: IU ↔ 아이유)
+- **가사 검색**: 가사 내용으로 노래 찾기
 - **다양한 정렬**: 관련도, 인기도, 최신순 정렬 지원
 - **고성능**: 대용량 데이터에서도 빠른 검색 응답
 
@@ -35,7 +37,18 @@ OPENSEARCH_INDEX_PREFIX=music
 pip install -r requirements.txt
 ```
 
-### 3. 인덱스 생성 및 데이터 동기화
+### 3. AWS OpenSearch 패키지 설정 (동의어 사전)
+
+아티스트 동의어 검색을 위해 AWS OpenSearch 패키지를 연결합니다:
+
+1. **AWS OpenSearch 콘솔** 접속
+2. 해당 도메인 선택
+3. **패키지** 탭에서 `artist-synonyms` 패키지를 도메인에 연결
+4. 연결 완료 대기 (몇 분 소요)
+
+**패키지 ID**: `F114268915` (코드에 자동으로 설정됨)
+
+### 4. 인덱스 생성 및 데이터 동기화
 
 #### 방법 1: Django 관리 명령어 사용 (권장)
 
@@ -162,12 +175,38 @@ const data = await response.json();
 
 OpenSearch는 다음 필드를 검색합니다:
 
-- **곡명** (가중치: 4) - 가장 높은 우선순위
-- **아티스트명** (가중치: 3) - 높은 우선순위
+- **아티스트명** (가중치: 5) - 최우선순위
+- **아티스트 동의어** (가중치: 5) - 최우선순위 (별명/본명 자동 매칭)
+- **곡명** (가중치: 3) - 높은 우선순위
 - **가사** (가중치: 2) - 중간 우선순위
-- **앨범명** (가중치: 1) - 낮은 우선순위
+- **앨범명** (가중치: 0.5) - 낮은 우선순위
 
-### 2. 가사 검색 (Lyrics Search) 🎤
+### 2. 동의어 검색 (Synonym Search) 🔄
+
+아티스트의 별명, 본명, 영어명을 자동으로 매칭합니다:
+
+**예시:**
+```bash
+# "IU"로 검색하면 "아이유"도 함께 검색됨
+GET /api/v1/search/opensearch?q=IU
+
+# "지드래곤"으로 검색하면 "G-Dragon"도 함께 검색됨
+GET /api/v1/search/opensearch?q=지드래곤
+
+# "BTS"로 검색하면 "방탄소년단"도 함께 검색됨
+GET /api/v1/search/opensearch?q=BTS
+```
+
+**특징:**
+- AWS OpenSearch 패키지로 관리되는 동의어 사전 사용
+- 양방향 매칭 지원 (한글 → 영문, 영문 → 한글)
+- 실시간 검색 적용
+
+**동의어 사전 업데이트 방법:**
+1. AWS OpenSearch 콘솔에서 패키지 수정
+2. 인덱스 재생성: `python manage.py opensearch_setup --reset`
+
+### 3. 가사 검색 (Lyrics Search) 🎤
 
 가사 내용으로도 노래를 찾을 수 있습니다:
 
@@ -184,7 +223,7 @@ GET /api/v1/search/opensearch?q=하늘을 나는
 - 가사의 일부분만 기억해도 검색 가능
 - 하이라이트 기능으로 매칭된 가사 부분 강조
 
-### 3. Ngram 기반 부분 일치
+### 4. Ngram 기반 부분 일치
 
 부분 문자열로도 검색 가능:
 
@@ -192,7 +231,7 @@ GET /api/v1/search/opensearch?q=하늘을 나는
 - "아이" → "아이유" 검색됨
 - "하늘" → "하늘을 나는 꿈" 가사 검색됨
 
-### 4. 퍼지 매칭 (오타 허용)
+### 5. 퍼지 매칭 (오타 허용)
 
 1-2글자 오타도 허용:
 
@@ -200,7 +239,7 @@ GET /api/v1/search/opensearch?q=하늘을 나는
 - "분홍시" → "분홍신" 검색됨
 - "사랑해요" → "사랑행요" 검색됨
 
-### 5. 정렬 옵션
+### 6. 정렬 옵션
 
 #### `relevance` (기본값)
 검색 관련도 순으로 정렬 (검색어와 가장 관련성 높은 결과 우선)
@@ -287,6 +326,11 @@ OpenSearch 인덱스는 다음과 같은 매핑을 사용합니다:
           "type": "custom",
           "tokenizer": "standard",
           "filter": ["lowercase", "ngram_filter"]
+        },
+        "synonym_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "artist_synonym_filter", "trim"]
         }
       },
       "filter": {
@@ -294,6 +338,10 @@ OpenSearch 인덱스는 다음과 같은 매핑을 사용합니다:
           "type": "ngram",
           "min_gram": 2,
           "max_gram": 10
+        },
+        "artist_synonym_filter": {
+          "type": "synonym",
+          "synonyms_path": "analyzers/F114268915"
         }
       }
     }
@@ -315,7 +363,8 @@ OpenSearch 인덱스는 다음과 같은 매핑을 사용합니다:
         "analyzer": "korean_analyzer",
         "fields": {
           "ngram": {"type": "text", "analyzer": "ngram_analyzer"},
-          "keyword": {"type": "keyword"}
+          "keyword": {"type": "keyword"},
+          "synonym": {"type": "text", "analyzer": "synonym_analyzer"}
         }
       },
       "album_name": {
@@ -385,7 +434,7 @@ OpenSearch 인덱스는 다음과 같은 매핑을 사용합니다:
 ## 📈 향후 개선 사항
 
 - [x] 가사 검색 (Lyrics Search) ✅
-- [ ] 유의어 검색 (아티스트 별명/본명 매칭)
+- [x] 동의어 검색 (아티스트 별명/본명 매칭) ✅
 - [ ] 자동완성 (Autocomplete) 기능 추가
 - [ ] 태그 기반 검색 통합
 - [ ] 검색 로그 분석 및 인기 검색어 추천
