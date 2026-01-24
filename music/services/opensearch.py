@@ -74,6 +74,7 @@ class OpenSearchService:
             "settings": {
                 "number_of_shards": 2,
                 "number_of_replicas": 1,
+                "index.max_ngram_diff": 10,  # ngram 차이 제한 설정
                 "analysis": {
                     "analyzer": {
                         "korean_analyzer": {
