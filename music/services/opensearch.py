@@ -74,6 +74,7 @@ class OpenSearchService:
             "settings": {
                 "number_of_shards": 2,
                 "number_of_replicas": 1,
+                "index.max_ngram_diff": 10,  # ngram 차이 제한 설정
                 "analysis": {
                     "analyzer": {
                         "korean_analyzer": {
@@ -85,6 +86,11 @@ class OpenSearchService:
                             "type": "custom",
                             "tokenizer": "standard",
                             "filter": ["lowercase", "ngram_filter"]
+                        },
+                        "synonym_analyzer": {
+                            "type": "custom",
+                            "tokenizer": "standard",
+                            "filter": ["lowercase", "artist_synonym_filter", "trim"]
                         }
                     },
                     "filter": {
@@ -92,6 +98,10 @@ class OpenSearchService:
                             "type": "ngram",
                             "min_gram": 2,
                             "max_gram": 10
+                        },
+                        "artist_synonym_filter": {
+                            "type": "synonym",
+                            "synonyms_path": "analyzers/F114268915"  # AWS 패키지 ID
                         }
                     }
                 }
@@ -123,6 +133,10 @@ class OpenSearchService:
                             },
                             "keyword": {
                                 "type": "keyword"
+                            },
+                            "synonym": {
+                                "type": "text",
+                                "analyzer": "synonym_analyzer"
                             }
                         }
                     },
@@ -416,14 +430,15 @@ class OpenSearchService:
                 "multi_match": {
                     "query": query,
                     "fields": [
-                        "music_name^4",           # 곡명에 가중치 4
-                        "music_name.ngram^3",     # 곡명 ngram에 가중치 3
-                        "artist_name^3",          # 아티스트명에 가중치 3
-                        "artist_name.ngram^2",    # 아티스트명 ngram에 가중치 2
+                        "artist_name^5",          # 아티스트명에 가중치 5 (최우선)
+                        "artist_name.synonym^5",  # 아티스트 동의어에 가중치 5
+                        "artist_name.ngram^4",    # 아티스트명 ngram에 가중치 4
+                        "music_name^3",           # 곡명에 가중치 3
+                        "music_name.ngram^2",     # 곡명 ngram에 가중치 2
                         "lyrics^2",               # 가사에 가중치 2
                         "lyrics.ngram",           # 가사 ngram
-                        "album_name",             # 앨범명
-                        "album_name.ngram"        # 앨범명 ngram
+                        "album_name^0.5",         # 앨범명 (낮은 가중치)
+                        "album_name.ngram^0.5"    # 앨범명 ngram (낮은 가중치)
                     ],
                     "type": "best_fields",
                     "fuzziness": "AUTO"
