@@ -203,6 +203,7 @@ class OpenSearchMusicSearchView(APIView):
             
             results.append({
                 'music_id': music_id,
+                'itunes_id': hit.get('itunes_id'),  # 호환성을 위해 포함 (None 가능)
                 'music_name': hit.get('music_name', ''),
                 'artist_name': hit.get('artist_name', ''),
                 'artist_id': hit.get('artist_id'),
