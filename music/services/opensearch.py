@@ -85,6 +85,11 @@ class OpenSearchService:
                             "type": "custom",
                             "tokenizer": "standard",
                             "filter": ["lowercase", "ngram_filter"]
+                        },
+                        "synonym_analyzer": {
+                            "type": "custom",
+                            "tokenizer": "standard",
+                            "filter": ["lowercase", "artist_synonym_filter", "trim"]
                         }
                     },
                     "filter": {
@@ -92,6 +97,10 @@ class OpenSearchService:
                             "type": "ngram",
                             "min_gram": 2,
                             "max_gram": 10
+                        },
+                        "artist_synonym_filter": {
+                            "type": "synonym",
+                            "synonyms_path": "analyzers/F114268915"  # AWS 패키지 ID
                         }
                     }
                 }
@@ -123,6 +132,10 @@ class OpenSearchService:
                             },
                             "keyword": {
                                 "type": "keyword"
+                            },
+                            "synonym": {
+                                "type": "text",
+                                "analyzer": "synonym_analyzer"
                             }
                         }
                     },
@@ -417,6 +430,7 @@ class OpenSearchService:
                     "query": query,
                     "fields": [
                         "artist_name^5",          # 아티스트명에 가중치 5 (최우선)
+                        "artist_name.synonym^5",  # 아티스트 동의어에 가중치 5
                         "artist_name.ngram^4",    # 아티스트명 ngram에 가중치 4
                         "music_name^3",           # 곡명에 가중치 3
                         "music_name.ngram^2",     # 곡명 ngram에 가중치 2

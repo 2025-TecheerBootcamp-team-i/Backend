@@ -179,11 +179,30 @@ class OpenSearchMusicSearchView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
+        # DB에서 audio_url과 album_image 조회
+        from ..models import Music
+        
+        itunes_ids = [hit.get('itunes_id') for hit in search_results['hits'] if hit.get('itunes_id')]
+        music_dict = {}
+        
+        if itunes_ids:
+            # DB에서 한 번에 조회 (select_related로 album도 JOIN)
+            musics = Music.objects.filter(
+                itunes_id__in=itunes_ids
+            ).select_related('album').only(
+                'itunes_id', 'audio_url', 'album_id', 'album__album_image'
+            )
+            # itunes_id를 키로 하는 딕셔너리 생성 (빠른 접근)
+            music_dict = {m.itunes_id: m for m in musics}
+        
         # 결과를 iTunes 검색 결과 형식으로 변환
         results = []
         for hit in search_results['hits']:
+            itunes_id = hit.get('itunes_id')
+            music_in_db = music_dict.get(itunes_id)
+            
             results.append({
-                'itunes_id': hit.get('itunes_id'),
+                'itunes_id': itunes_id,
                 'music_name': hit.get('music_name', ''),
                 'artist_name': hit.get('artist_name', ''),
                 'artist_id': hit.get('artist_id'),
@@ -191,8 +210,8 @@ class OpenSearchMusicSearchView(APIView):
                 'album_id': hit.get('album_id'),
                 'genre': hit.get('genre', ''),
                 'duration': hit.get('duration'),
-                'audio_url': None,  # OpenSearch에는 URL 저장 안 함
-                'album_image': None,  # OpenSearch에는 이미지 URL 저장 안 함
+                'audio_url': music_in_db.audio_url if music_in_db else None,
+                'album_image': music_in_db.album.album_image if (music_in_db and music_in_db.album) else None,
                 'in_db': True,  # OpenSearch에 있다는 것은 DB에도 있다는 의미
                 'has_matching_tags': False,
                 '_score': hit.get('_score'),  # 검색 점수
