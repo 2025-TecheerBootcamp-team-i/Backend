@@ -307,12 +307,12 @@ class OpenSearchSyncView(APIView):
             # DB에서 모든 음악 조회
             musics = Music.objects.select_related(
                 'artist', 'album'
-            ).prefetch_related('music_tags__tag')
+            ).prefetch_related('musictags_set__tag')
             
             music_list = []
             for music in musics:
                 # 태그 추출
-                tags = [mt.tag.tag_key for mt in music.music_tags.all() if mt.tag]
+                tags = [mt.tag.tag_key for mt in music.musictags_set.all() if mt.tag]
                 
                 music_data = {
                     'music_id': music.music_id,
