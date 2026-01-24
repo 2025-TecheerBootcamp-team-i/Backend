@@ -373,11 +373,13 @@ class MusicTagGraphView(APIView):
         - name: "Tags" (루트 노드)
         - children: 각 태그 정보 배열
           - name: 태그명
-          - size: 밀접도 점수 (score)
+          - size: 시각적 가중치 (score의 제곱)
+          - score: 실제 밀접도 점수
           - percentage: 전체 점수 중 차지하는 비율 (%)
         
         **특징:**
-        - 백엔드에서 점수 합계를 기반으로 정규화된 percentage를 계산하여 제공합니다.
+        - dataKey="size"를 사용하여 시각적으로 점수 차이를 강조 (제곱 비례)
+        - percentage는 원본 점수 비율 유지
         """,
         parameters=[
             OpenApiParameter(
