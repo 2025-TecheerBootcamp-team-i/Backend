@@ -53,3 +53,18 @@ class AiMusicSearchResultSerializer(serializers.Serializer):
             seconds = obj.duration % 60
             return f"{minutes}:{seconds:02d}"
         return None
+
+
+class TagMusicSearchSerializer(serializers.Serializer):
+    """
+    태그로 음악 검색 결과용 Serializer
+    
+    - 특정 태그를 가진 모든 음악 반환
+    - music_id, album_name, artist_name, 앨범 이미지 정보 포함
+    """
+    music_id = serializers.IntegerField()
+    album_name = serializers.CharField(allow_null=True)
+    artist_name = serializers.CharField(allow_null=True)
+    image_large_square = serializers.CharField(allow_null=True)  # 360x360 사각형 이미지
+    image_square = serializers.CharField(allow_null=True)  # 220x220 사각형 이미지
+    album_image = serializers.CharField(allow_null=True)  # 원본 앨범 이미지

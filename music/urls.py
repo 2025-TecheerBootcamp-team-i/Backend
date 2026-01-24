@@ -14,6 +14,7 @@ from .views import (
     UserLikedMusicListView,
     MusicSearchView,
     AiMusicSearchView,
+    TagMusicSearchView,
     MusicDetailView as iTunesMusicDetailView,  # iTunes 기반 상세 조회 (기존)
     MusicTagsView,  # 음악 태그 조회
     MusicTagGraphView, # 음악 태그 그래프 조회
@@ -94,6 +95,10 @@ urlpatterns = [
     # AI 음악 검색 (AI 음악 전용)
     # GET /api/music/search-ai/?q={검색어}
     path('search-ai/', AiMusicSearchView.as_view(), name='ai-music-search'),
+    
+    # 태그로 음악 검색
+    # GET /api/v1/search/tags?tag={tag_key}&page={num}&page_size={num}
+    path('search/tags', TagMusicSearchView.as_view(), name='tag-music-search'),
     
     # OpenSearch 기반 검색
     # GET /api/v1/search/opensearch?q={검색어}&sort_by={정렬}&exclude_ai={bool}

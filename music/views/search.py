@@ -11,7 +11,7 @@ from django.db.models import Q, Prefetch
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 from ..models import Music, MusicTags, Tags, Artists, Albums, AiInfo
-from ..serializers import iTunesSearchResultSerializer, AiMusicSearchResultSerializer
+from ..serializers import iTunesSearchResultSerializer, AiMusicSearchResultSerializer, TagMusicSearchSerializer
 from ..services import iTunesService
 from ..tasks import fetch_artist_image_task, fetch_album_image_task
 from .common import MusicPagination
@@ -446,3 +446,202 @@ class AiMusicSearchView(APIView):
             'count': music_queryset.count(),
             'results': serializer.data
         })
+
+
+class TagMusicSearchView(APIView):
+    """
+    태그로 음악 검색
+    
+    - 최대 3개의 태그를 가진 모든 음악 반환 (OR 조건)
+    - 중복 결과 제거
+    - music_id, album_name, artist_name, 앨범 이미지 정보 포함
+    
+    GET /api/v1/search/tags?tag={tag_key}&tag={tag_key2}&tag={tag_key3}&page={num}&page_size={num}
+    """
+    permission_classes = [AllowAny]
+    pagination_class = MusicPagination
+    
+    @extend_schema(
+        summary="태그로 음악 검색",
+        description="""
+        최대 3개의 태그를 가진 모든 음악을 검색합니다 (OR 조건).
+        여러 태그 중 하나라도 가진 음악이 모두 반환되며, 중복 결과는 자동으로 제거됩니다.
+        
+        **반환 정보:**
+        - music_id: 음악 ID
+        - album_name: 앨범명
+        - artist_name: 아티스트명
+        - image_large_square: 360x360 사각형 이미지
+        - image_square: 220x220 사각형 이미지
+        - album_image: 원본 앨범 이미지
+        
+        **주의사항:**
+        - 삭제되지 않은 음악과 태그만 반환됩니다
+        - 최대 3개의 태그까지 검색 가능합니다
+        - 중복된 음악은 자동으로 제거됩니다
+        - 존재하지 않는 태그는 무시됩니다
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='tag',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='태그 이름 (tag_key), 최대 3개까지 가능 (쉼표로 구분)',
+                required=True,
+                examples=[
+                    OpenApiExample(
+                        name='단일 태그 검색',
+                        value='christmas',
+                        description='"christmas" 태그를 가진 모든 음악 검색'
+                    ),
+                    OpenApiExample(
+                        name='여러 태그 검색',
+                        value='christmas,신나는,겨울',
+                        description='?tag=christmas,신나는,겨울 - 3개 태그 중 하나라도 가진 음악 검색 (쉼표로 구분)'
+                    ),
+                ]
+            ),
+            OpenApiParameter(
+                name='page',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='페이지 번호',
+                required=False,
+                default=1
+            ),
+            OpenApiParameter(
+                name='page_size',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='페이지 크기 (최대 100)',
+                required=False,
+                default=20
+            ),
+        ],
+        responses={
+            200: TagMusicSearchSerializer(many=True),
+            400: {'description': 'Bad Request - tag 파라미터 필요'},
+            404: {'description': 'Not Found - 태그를 찾을 수 없음'},
+        },
+        tags=['검색']
+    )
+    def get(self, request):
+        """태그로 음악 검색 처리 (최대 3개 태그, 중복 제거)"""
+        # 태그 파라미터 받기 (쉼표로 구분)
+        tag_param = request.query_params.get('tag', '').strip()
+        
+        if not tag_param:
+            return Response(
+                {'error': 'tag 파라미터가 필요합니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 쉼표로 구분된 태그 파싱
+        tag_keys = [tag.strip() for tag in tag_param.split(',') if tag.strip()]
+        
+        # 최대 3개까지만 허용
+        if len(tag_keys) > 3:
+            return Response(
+                {'error': '태그는 최대 3개까지 검색할 수 있습니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 1. 태그 존재 여부 확인 (존재하지 않는 태그는 무시)
+        tags = Tags.objects.filter(
+            tag_key__in=tag_keys,
+            is_deleted=False
+        )
+        
+        if not tags.exists():
+            return Response(
+                {'error': f'태그를 찾을 수 없습니다: {", ".join(tag_keys)}'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # 2. 각 태그에 대해 음악 조회 (OR 조건)
+        # MusicTags를 통해 Music을 직접 조회 (album, artist 포함)
+        music_tags = MusicTags.objects.filter(
+            tag__in=tags,
+            is_deleted=False
+        ).select_related(
+            'music',      # 음악 정보
+            'music__album',  # 앨범 정보
+            'music__artist'  # 아티스트 정보
+        )
+        
+        # 3. 삭제되지 않은 음악만 필터링하고 중복 제거 (music_id 기준)
+        music_dict = {}  # music_id를 키로 사용하여 중복 제거
+        for mt in music_tags:
+            if mt.music and not mt.music.is_deleted:
+                music_dict[mt.music.music_id] = mt.music
+        
+        # 리스트로 변환
+        music_list = list(music_dict.values())
+        
+        # 최신순 정렬
+        music_list.sort(key=lambda m: m.created_at if m.created_at else timezone.now(), reverse=True)
+        
+        # queryset처럼 사용하기 위해 리스트를 사용
+        # 페이지네이션을 위해 리스트를 사용
+        
+        # 4. 결과 데이터 생성
+        results = []
+        for music in music_list:
+            album = music.album
+            artist = music.artist
+            
+            results.append({
+                'music_id': music.music_id,
+                'album_name': album.album_name if album else None,
+                'artist_name': artist.artist_name if artist else None,
+                'image_large_square': album.image_large_square if album else None,
+                'image_square': album.image_square if album else None,
+                'album_image': album.album_image if album else None,
+            })
+        
+        # 5. 페이지네이션
+        paginator = self.pagination_class()
+        # 리스트를 페이지네이션하기 위해 임시로 queryset처럼 사용
+        # 페이지네이션은 리스트를 직접 처리할 수 없으므로 수동으로 처리
+        page = request.query_params.get('page', 1)
+        page_size = request.query_params.get('page_size', 20)
+        
+        try:
+            page = int(page)
+            page_size = int(page_size)
+            page_size = min(page_size, 100)  # 최대 100개
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 20
+        
+        # 페이지네이션 계산
+        total_count = len(results)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated_results = results[start:end]
+        
+        # Serializer로 변환
+        serializer = TagMusicSearchSerializer(paginated_results, many=True)
+        
+        # 페이지네이션 메타데이터 생성
+        next_page = None
+        previous_page = None
+        
+        if end < total_count:
+            next_page = page + 1
+        if start > 0:
+            previous_page = page - 1
+        
+        # URL 파라미터 재구성 (여러 태그 포함, 쉼표로 구분)
+        base_url = request.build_absolute_uri().split('?')[0]
+        tag_params = f"tag={','.join(tag_keys)}"
+        
+        # 응답 데이터 구성
+        response_data = {
+            'count': total_count,
+            'next': f"{base_url}?{tag_params}&page={next_page}&page_size={page_size}" if next_page else None,
+            'previous': f"{base_url}?{tag_params}&page={previous_page}&page_size={page_size}" if previous_page else None,
+            'results': serializer.data
+        }
+        
+        return Response(response_data)
