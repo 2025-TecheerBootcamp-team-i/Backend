@@ -373,12 +373,12 @@ class MusicTagGraphView(APIView):
         - name: "Tags" (루트 노드)
         - children: 각 태그 정보 배열
           - name: 태그명
-          - size: 시각적 가중치 (score의 제곱)
+          - size: 시각적 가중치 (score의 세제곱)
           - score: 실제 밀접도 점수
           - percentage: 전체 점수 중 차지하는 비율 (%)
         
         **특징:**
-        - dataKey="size"를 사용하여 시각적으로 점수 차이를 강조 (제곱 비례)
+        - dataKey="size"를 사용하여 시각적으로 점수 차이를 강조 (세제곱 비례)
         - percentage는 원본 점수 비율 유지
         """,
         parameters=[

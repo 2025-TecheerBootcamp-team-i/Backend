@@ -39,7 +39,7 @@ class OpenSearchService:
                     use_ssl=settings.OPENSEARCH_USE_SSL,
                     verify_certs=settings.OPENSEARCH_VERIFY_CERTS,
                     connection_class=RequestsHttpConnection,
-                    timeout=30,
+                    timeout=120,
                 )
                 logger.info(f"OpenSearch 클라이언트 초기화 완료: {settings.OPENSEARCH_HOST}")
             except Exception as e:
@@ -426,22 +426,54 @@ class OpenSearchService:
         
         # 텍스트 검색 쿼리
         if query and query.strip():
+            # should 쿼리로 변경하여 여러 매칭 전략 조합
             must_clauses.append({
-                "multi_match": {
-                    "query": query,
-                    "fields": [
-                        "artist_name^5",          # 아티스트명에 가중치 5 (최우선)
-                        "artist_name.synonym^5",  # 아티스트 동의어에 가중치 5
-                        "artist_name.ngram^4",    # 아티스트명 ngram에 가중치 4
-                        "music_name^3",           # 곡명에 가중치 3
-                        "music_name.ngram^2",     # 곡명 ngram에 가중치 2
-                        "lyrics^2",               # 가사에 가중치 2
-                        "lyrics.ngram",           # 가사 ngram
-                        "album_name^0.5",         # 앨범명 (낮은 가중치)
-                        "album_name.ngram^0.5"    # 앨범명 ngram (낮은 가중치)
+                "bool": {
+                    "should": [
+                        # 1. 정확한 매칭 (최우선, fuzziness 없음)
+                        {
+                            "multi_match": {
+                                "query": query,
+                                "fields": [
+                                    "artist_name^10",        # 아티스트 정확 매칭 최우선
+                                    "music_name^8",          # 곡명 정확 매칭
+                                    "album_name^2"           # 앨범명 정확 매칭
+                                ],
+                                "type": "phrase",
+                                "boost": 3.0                 # 정확한 매칭에 3배 부스트
+                            }
+                        },
+                        # 2. Fuzzy 매칭 (오타 보정)
+                        {
+                            "multi_match": {
+                                "query": query,
+                                "fields": [
+                                    "artist_name^5",
+                                    "artist_name.synonym^5",
+                                    "music_name^3",
+                                    "lyrics^2"
+                                ],
+                                "type": "best_fields",
+                                "fuzziness": "AUTO",
+                                "boost": 2.0                 # fuzzy 매칭에 2배 부스트
+                            }
+                        },
+                        # 3. Ngram 매칭 (부분 매칭, 가장 낮은 우선순위)
+                        {
+                            "multi_match": {
+                                "query": query,
+                                "fields": [
+                                    "artist_name.ngram^2",
+                                    "music_name.ngram",
+                                    "lyrics.ngram",
+                                    "album_name.ngram^0.5"
+                                ],
+                                "type": "best_fields",
+                                "boost": 1.0                 # ngram은 기본 부스트
+                            }
+                        }
                     ],
-                    "type": "best_fields",
-                    "fuzziness": "AUTO"
+                    "minimum_should_match": 1
                 }
             })
         else:
