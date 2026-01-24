@@ -69,7 +69,8 @@ class MusicPlaySerializer(serializers.ModelSerializer):
 class TagGraphItemSerializer(serializers.Serializer):
     """트리맵 항목용 시리얼라이저 (태그 개별 항목)"""
     name = serializers.CharField(source='tag.tag_key')
-    size = serializers.FloatField(source='score')
+    size = serializers.FloatField(source='weight')
+    score = serializers.FloatField()
     percentage = serializers.FloatField()
 
 
