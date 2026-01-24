@@ -11,7 +11,8 @@ class iTunesSearchResultSerializer(serializers.Serializer):
 
     - artist_id, album_id는 DB에 해당 데이터가 있을 때만 포함 (없으면 null)
     """
-    itunes_id = serializers.IntegerField()
+    music_id = serializers.IntegerField(allow_null=True)  # 음악 ID (DB 기본 키)
+    itunes_id = serializers.IntegerField(allow_null=True)  # iTunes ID (없을 수 있음)
     music_name = serializers.CharField()
     artist_name = serializers.CharField()
     artist_id = serializers.IntegerField(allow_null=True)  # 아티스트 ID (DB에 있을 때만)
