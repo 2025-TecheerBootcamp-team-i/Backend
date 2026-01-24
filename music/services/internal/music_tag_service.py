@@ -37,7 +37,7 @@ class MusicTagService:
         music_tags = MusicTags.objects.filter(
             music_id=music_id,
             tag__is_deleted=False
-        ).select_related('tag')
+        ).select_related('tag').order_by('-score')[:8]
         
         if not music_tags.exists():
             return []
