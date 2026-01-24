@@ -2,6 +2,7 @@
 검색 관련 Views - iTunes 기반 음악 검색 및 AI 음악 검색
 """
 import re
+import random
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -466,20 +467,24 @@ class TagMusicSearchView(APIView):
         description="""
         최대 3개의 태그를 가진 모든 음악을 검색합니다 (OR 조건).
         여러 태그 중 하나라도 가진 음악이 모두 반환되며, 중복 결과는 자동으로 제거됩니다.
+        결과는 랜덤으로 반환되며, 최대 150개까지만 반환됩니다.
         
         **반환 정보:**
         - music_id: 음악 ID
+        - music_name: 음악 제목
         - album_name: 앨범명
         - artist_name: 아티스트명
         - image_large_square: 360x360 사각형 이미지
         - image_square: 220x220 사각형 이미지
         - album_image: 원본 앨범 이미지
+        - score: 태그 밀접도 점수 (music_tags.score, 높을수록 태그와 관련성이 높음)
         
         **주의사항:**
         - 삭제되지 않은 음악과 태그만 반환됩니다
         - 최대 3개의 태그까지 검색 가능합니다
-        - 중복된 음악은 자동으로 제거됩니다
+        - 중복된 음악은 자동으로 제거됩니다 (여러 태그에 속한 경우 가장 높은 score 유지)
         - 존재하지 않는 태그는 무시됩니다
+        - 최대 150개까지만 반환됩니다 (랜덤 순서, 중복 없음)
         """,
         parameters=[
             OpenApiParameter(
@@ -513,7 +518,7 @@ class TagMusicSearchView(APIView):
                 name='page_size',
                 type=OpenApiTypes.INT,
                 location=OpenApiParameter.QUERY,
-                description='페이지 크기 (최대 100)',
+                description='페이지 크기 (최대 150)',
                 required=False,
                 default=20
             ),
@@ -570,33 +575,51 @@ class TagMusicSearchView(APIView):
         )
         
         # 3. 삭제되지 않은 음악만 필터링하고 중복 제거 (music_id 기준)
+        # 중복 시 가장 높은 score를 가진 것을 유지
         music_dict = {}  # music_id를 키로 사용하여 중복 제거
         for mt in music_tags:
             if mt.music and not mt.music.is_deleted:
-                music_dict[mt.music.music_id] = mt.music
+                music_id = mt.music.music_id
+                # 중복된 경우 더 높은 score를 가진 것을 유지
+                if music_id not in music_dict:
+                    music_dict[music_id] = {
+                        'music': mt.music,
+                        'score': mt.score if mt.score is not None else 0.0
+                    }
+                else:
+                    # 기존 score보다 높으면 업데이트
+                    if mt.score is not None and mt.score > music_dict[music_id]['score']:
+                        music_dict[music_id]['score'] = mt.score
         
         # 리스트로 변환
         music_list = list(music_dict.values())
         
-        # 최신순 정렬
-        music_list.sort(key=lambda m: m.created_at if m.created_at else timezone.now(), reverse=True)
+        # 랜덤으로 섞기 (중복 없음 보장)
+        random.shuffle(music_list)
+        
+        # 최대 150개로 제한
+        music_list = music_list[:150]
         
         # queryset처럼 사용하기 위해 리스트를 사용
         # 페이지네이션을 위해 리스트를 사용
         
         # 4. 결과 데이터 생성
         results = []
-        for music in music_list:
+        for item in music_list:
+            music = item['music']
+            score = item['score']
             album = music.album
             artist = music.artist
             
             results.append({
                 'music_id': music.music_id,
+                'music_name': music.music_name,
                 'album_name': album.album_name if album else None,
                 'artist_name': artist.artist_name if artist else None,
                 'image_large_square': album.image_large_square if album else None,
                 'image_square': album.image_square if album else None,
                 'album_image': album.album_image if album else None,
+                'score': score,
             })
         
         # 5. 페이지네이션
@@ -609,7 +632,7 @@ class TagMusicSearchView(APIView):
         try:
             page = int(page)
             page_size = int(page_size)
-            page_size = min(page_size, 100)  # 최대 100개
+            page_size = min(page_size, 150)  # 최대 150개
         except (ValueError, TypeError):
             page = 1
             page_size = 20

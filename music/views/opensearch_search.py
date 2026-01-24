@@ -182,27 +182,27 @@ class OpenSearchMusicSearchView(APIView):
         # DB에서 audio_url과 album_image 조회
         from ..models import Music
         
-        itunes_ids = [hit.get('itunes_id') for hit in search_results['hits'] if hit.get('itunes_id')]
+        music_ids = [hit.get('music_id') for hit in search_results['hits'] if hit.get('music_id')]
         music_dict = {}
         
-        if itunes_ids:
+        if music_ids:
             # DB에서 한 번에 조회 (select_related로 album도 JOIN)
             musics = Music.objects.filter(
-                itunes_id__in=itunes_ids
+                music_id__in=music_ids
             ).select_related('album').only(
-                'itunes_id', 'audio_url', 'album_id', 'album__album_image'
+                'music_id', 'audio_url', 'album_id', 'album__album_image'
             )
-            # itunes_id를 키로 하는 딕셔너리 생성 (빠른 접근)
-            music_dict = {m.itunes_id: m for m in musics}
+            # music_id를 키로 하는 딕셔너리 생성 (빠른 접근)
+            music_dict = {m.music_id: m for m in musics}
         
         # 결과를 iTunes 검색 결과 형식으로 변환
         results = []
         for hit in search_results['hits']:
-            itunes_id = hit.get('itunes_id')
-            music_in_db = music_dict.get(itunes_id)
+            music_id = hit.get('music_id')
+            music_in_db = music_dict.get(music_id)
             
             results.append({
-                'itunes_id': itunes_id,
+                'music_id': music_id,
                 'music_name': hit.get('music_name', ''),
                 'artist_name': hit.get('artist_name', ''),
                 'artist_id': hit.get('artist_id'),
