@@ -471,6 +471,7 @@ class TagMusicSearchView(APIView):
         
         **반환 정보:**
         - music_id: 음악 ID
+        - music_name: 음악 제목
         - album_name: 앨범명
         - artist_name: 아티스트명
         - image_large_square: 360x360 사각형 이미지
@@ -612,6 +613,7 @@ class TagMusicSearchView(APIView):
             
             results.append({
                 'music_id': music.music_id,
+                'music_name': music.music_name,
                 'album_name': album.album_name if album else None,
                 'artist_name': artist.artist_name if artist else None,
                 'image_large_square': album.image_large_square if album else None,
