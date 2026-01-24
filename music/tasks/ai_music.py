@@ -190,8 +190,16 @@ def generate_music_task(self, user_prompt: str, user_id: int = None, make_instru
             updated_at=now,
             is_deleted=False
         )
-        
-        # 8. 결과 반환
+
+        # 8. S3 업로드 태스크 호출 (비동기)
+        if audio_url and is_suno_url(audio_url):
+            try:
+                logger.info(f"[S3 업로드] S3 오디오 업로드 태스크 호출: music_id={music.music_id}")
+                upload_suno_audio_to_s3_task.delay(music.music_id, audio_url)
+            except Exception as e:
+                logger.warning(f"[S3 업로드] S3 업로드 태스크 호출 실패 (계속 진행): {e}")
+
+        # 9. 결과 반환
         return {
             'success': True,
             'artist': {
