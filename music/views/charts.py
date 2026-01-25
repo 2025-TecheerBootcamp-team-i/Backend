@@ -124,7 +124,10 @@ class ChartView(APIView):
         
         # 3. 현재 차트 조회
         # DB가 timestamp(timezone 없음)이므로 날짜+시간 문자열로 비교
-        chart_items = Charts.objects.filter(type=type).extra(
+        chart_items = Charts.objects.filter(
+            type=type,
+            music__is_deleted=False  # 삭제된 음악 제외
+        ).extra(
             where=["chart_date::text = %s::text"],
             params=[str(latest_chart.chart_date)]
         ).select_related(
@@ -143,11 +146,14 @@ class ChartView(APIView):
         previous_ranks = {}
         if previous_chart:
             # 이전 차트의 순위 정보를 {music_id: rank} 딕셔너리로 구성
-            previous_items = Charts.objects.filter(type=type).extra(
+            previous_items = Charts.objects.filter(
+                type=type,
+                music__is_deleted=False  # 삭제된 음악 제외
+            ).extra(
                 where=["chart_date::text = %s::text"],
                 params=[str(previous_chart.chart_date)]
             ).values('music_id', 'rank')
-            
+
             previous_ranks = {item['music_id']: item['rank'] for item in previous_items}
         
         # 5. 각 차트 항목에 rank_change 추가
