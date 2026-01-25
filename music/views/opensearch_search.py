@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 from ..services.opensearch import opensearch_service
+from ..services.recommend_client import recommendation_client
 from ..serializers import iTunesSearchResultSerializer
 from .common import MusicPagination
 
@@ -236,11 +237,28 @@ class OpenSearchMusicSearchView(APIView):
         
         serializer = iTunesSearchResultSerializer(results, many=True)
         
+        # 추천 아티스트 추가 (검색어가 아티스트명인 경우)
+        related_artists = []
+        if results and len(results) > 0:
+            # 첫 번째 결과의 아티스트를 기준으로 추천
+            first_artist_name = results[0].get('artist_name')
+            if first_artist_name:
+                try:
+                    related_artists = recommendation_client.get_recommendations_by_mood(
+                        artist_name=first_artist_name,
+                        limit=10
+                    )
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning(f"추천 아티스트 조회 실패: {e}")
+                    related_artists = []
+        
         return Response({
             'count': total,
             'next': next_page,
             'previous': previous_page,
-            'results': serializer.data
+            'results': serializer.data,
+            'related_artists': related_artists  # 추천 아티스트 추가
         })
 
 
@@ -350,6 +368,8 @@ class OpenSearchSyncView(APIView):
                     'created_at': music.created_at.isoformat() if music.created_at else None,
                     'play_count': 0,  # TODO: 재생 수 통계 추가
                     'like_count': 0,  # TODO: 좋아요 수 통계 추가
+                    'valence': float(music.valence) if music.valence is not None else None,  # 감정가
+                    'arousal': float(music.arousal) if music.arousal is not None else None,  # 각성도
                 }
                 music_list.append(music_data)
             
