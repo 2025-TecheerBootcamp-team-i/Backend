@@ -432,6 +432,15 @@ class OpenSearchService:
             must_clauses.append({
                 "bool": {
                     "should": [
+                        # 0. 아티스트명 정확 일치 (최우선순위)
+                        {
+                            "term": {
+                                "artist_name.keyword": {
+                                    "value": query,
+                                    "boost": 100.0  # 정확히 일치하는 아티스트는 100배 부스트
+                                }
+                            }
+                        },
                         # 1. 정확한 매칭 (최우선, fuzziness 없음)
                         {
                             "multi_match": {
