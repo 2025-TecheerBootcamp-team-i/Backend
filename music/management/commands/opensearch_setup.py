@@ -150,6 +150,8 @@ class Command(BaseCommand):
                 'created_at': music.created_at.isoformat() if music.created_at else None,
                 'play_count': 0,  # TODO: 재생 수 통계 추가
                 'like_count': 0,  # TODO: 좋아요 수 통계 추가
+                'valence': float(music.valence) if music.valence is not None else None,  # 감정가 (추천 시스템용)
+                'arousal': float(music.arousal) if music.arousal is not None else None,  # 각성도 (추천 시스템용)
             }
             music_list.append(music_data)
         

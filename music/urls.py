@@ -18,6 +18,7 @@ from .views import (
     MusicDetailView as iTunesMusicDetailView,  # iTunes 기반 상세 조회 (기존)
     MusicTagsView,  # 음악 태그 조회
     MusicTagGraphView, # 음악 태그 그래프 조회
+    MusicCuratedStationView, # DJ 스테이션 (큐레이션) 조회
     ArtistDetailView,
     ArtistTracksView,
     ArtistAlbumsView,
@@ -133,6 +134,10 @@ urlpatterns = [
     # 음악 태그 그래프 데이터 조회 (Treemap)
     # GET /api/v1/tracks/{music_id}/tag-graph
     path('tracks/<int:music_id>/tag-graph', MusicTagGraphView.as_view(), name='music-tag-graph'),
+
+    # DJ 스테이션 (큐레이션) 조회
+    # GET /api/v1/tracks/station/curated
+    path('tracks/station/curated', MusicCuratedStationView.as_view(), name='music-station-curated'),
 
     # 인기 아티스트 목록 조회
     # GET /api/v1/artists/popular?limit=7

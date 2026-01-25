@@ -414,3 +414,34 @@ class MusicTagGraphView(APIView):
         # 3. 데이터 반환
         serializer = MusicTagGraphSerializer(graph_data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class MusicCuratedStationView(APIView):
+    """
+    DJ 스테이션 (상황별 추천) 큐레이션 데이터 조회
+    - GET: 직접 선별된 상황별 추천 곡 목록 반환
+    
+    GET /api/v1/tracks/station/curated
+    """
+    permission_classes = [AllowAny]
+    
+    @extend_schema(
+        summary="DJ 스테이션 (큐레이션) 조회",
+        description="""
+        상황별로 직접 선별된 추천 곡 리스트를 반환합니다.
+        (신나는 노래, 우울할 때, 이별 노래 등)
+        
+        **특징:**
+        - 한국 가요와 팝송이 섞여서 반환됩니다.
+        - 각 카테고리별로 정해진 곡 목록 중 DB에 존재하는 곡만 반환됩니다.
+        """,
+        responses={
+            200: OpenApiTypes.OBJECT,
+        },
+        tags=['음악 상세']
+    )
+    def get(self, request):
+        """DJ 스테이션 데이터 조회"""
+        station_data = MusicTagService.get_curated_station_data()
+        return Response(station_data, status=status.HTTP_200_OK)
+
