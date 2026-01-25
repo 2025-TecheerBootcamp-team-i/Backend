@@ -168,7 +168,9 @@ class OpenSearchService:
                     },
                     "created_at": {"type": "date"},
                     "play_count": {"type": "integer"},
-                    "like_count": {"type": "integer"}
+                    "like_count": {"type": "integer"},
+                    "valence": {"type": "float"},
+                    "arousal": {"type": "float"}
                 }
             }
         }
