@@ -190,9 +190,7 @@ class OpenSearchMusicSearchView(APIView):
             # DB에서 한 번에 조회 (select_related로 album도 JOIN)
             musics = Music.objects.filter(
                 music_id__in=music_ids
-            ).select_related('album').only(
-                'music_id', 'audio_url', 'album_id', 'album__album_image'
-            )
+            ).select_related('album')
             # music_id를 키로 하는 딕셔너리 생성 (빠른 접근)
             music_dict = {m.music_id: m for m in musics}
         
