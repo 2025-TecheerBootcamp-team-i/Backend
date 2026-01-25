@@ -32,7 +32,8 @@ def update_realtime_chart():
             results = PlayLogs.objects.filter(
                 played_at__gte=start_time,
                 played_at__lt=now,
-                is_deleted=False
+                is_deleted=False,
+                music__is_deleted=False  # 삭제된 음악 제외
             ).values('music_id').annotate(
                 play_count=Count('play_log_id')
             ).order_by('-play_count')[:100]
@@ -87,7 +88,8 @@ def update_daily_chart():
             results = PlayLogs.objects.filter(
                 played_at__gte=yesterday_start,
                 played_at__lt=yesterday_end,
-                is_deleted=False
+                is_deleted=False,
+                music__is_deleted=False  # 삭제된 음악 제외
             ).values('music_id').annotate(
                 play_count=Count('play_log_id')
             ).order_by('-play_count')[:100]
