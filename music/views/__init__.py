@@ -28,7 +28,7 @@ from .likes import MusicLikeView, TrackLikesCountView, UserLikedMusicListView, A
 from .search import MusicSearchView, AiMusicSearchView, TagMusicSearchView
 
 # 음악 상세 관련 Views
-from .music import MusicDetailView, MusicPlayView, MusicTagsView, MusicTagGraphView
+from .music import MusicDetailView, MusicPlayView, MusicTagsView, MusicTagGraphView, MusicCuratedStationView
 
 # 아티스트 관련 Views
 from .artists import ArtistDetailView, ArtistTracksView, ArtistAlbumsView, AlbumDetailView, PopularArtistsView
