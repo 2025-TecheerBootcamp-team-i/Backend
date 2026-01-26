@@ -6,6 +6,7 @@ import logging
 from typing import List, Dict, Any
 from django.db.models import Sum
 from ...models import Music, MusicTags
+from ...serializers.music import MusicPlaySerializer
 
 logger = logging.getLogger(__name__)
 
@@ -123,15 +124,11 @@ class MusicTagService:
                     is_deleted=False
                 ).select_related('artist', 'album')
 
-                # 3. 데이터 변환
+                # 3. 데이터 변환 (Serializer 사용)
+                #    MusicPlaySerializer를 사용하여 재생에 필요한 모든 정보(audio_url 등)를 포함
                 tracks = []
                 for music in found_songs:
-                    tracks.append({
-                        "music_id": music.music_id,
-                        "music_name": music.music_name,
-                        "artist": music.artist.artist_name if music.artist else "Unknown",
-                        "album_image": music.album.album_image if music.album else "",
-                    })
+                    tracks.append(MusicPlaySerializer(music).data)
                 
                 # 4. 셔플
                 random.shuffle(tracks)
