@@ -73,49 +73,81 @@ class MusicTagService:
     def get_curated_station_data(cls) -> List[Dict[str, Any]]:
         """
         DJ 스테이션용 큐레이션 음악 데이터 반환
-        지정된 리스트(STATION_CURATION)에 있는 음악들을 DB에서 조회하여 반환
+        STATION_DATA에 있는 음악들을 DB에서 조회하여 반환
+        
+        Returns:
+            [
+                {
+                    "theme": "느낌 별 스테이션", # or "Genre"
+                    "station_data": [
+                         { "category": "신나는 노래", "tracks": [...] },
+                         ...
+                    ]
+                },
+                ...
+            ]
         """
         import random
         from django.db.models import Q
-        from .station_data import STATION_CURATION
+        from .station_data import STATION_DATA
 
-        station_data = []
+        result = []
+        
+        # STATION_DATA = { "mood": {...}, "genre": {...} }
+        theme_titles = {
+            "mood": "느낌 별 스테이션",
+            "genre": "장르 별 스테이션"
+        }
 
-        for category, song_list in STATION_CURATION.items():
-            # 1. 쿼리 구성: (제목 AND 아티스트) OR (제목 AND 아티스트) ...
-            # 정확한 매칭을 위해 제목과 아티스트를 모두 조건으로 사용
-            q_objects = Q()
-            for song in song_list:
-                q_objects |= Q(music_name__iexact=song['title'], artist__artist_name__iexact=song['artist'])
+        for theme_key, stations in STATION_DATA.items():
             
-            # 2. DB 조회
-            found_songs = Music.objects.filter(
-                q_objects,
-                is_deleted=False
-            ).select_related('artist', 'album')
+            theme_station_list = []
+            
+            for category, song_list in stations.items():
+                # 1. 쿼리 구성
+                q_objects = Q()
+                for song in song_list:
+                    # 정확도가 중요하므로 author, title 모두 체크 (부분일치 iexact 사용)
+                    # DB에 저장된 아티스트명과 입력된 아티스트명이 다를 수 있음 (예: 세븐틴 vs SEVENTEEN)
+                    # 지금은 정확한 매칭을 시도
+                    q_objects |= Q(music_name__iexact=song['title'], artist__artist_name__icontains=song['artist'])
+                    # OR 조건으로 유연하게 하고 싶다면:
+                    # q_objects |= (Q(music_name__iexact=song['title']) & Q(artist__artist_name__icontains=song['artist']))
+                
+                if not q_objects:
+                    continue
 
-            # 3. 데이터 변환
-            tracks = []
-            for music in found_songs:
-                tracks.append({
-                    "music_id": music.music_id,
-                    "music_name": music.music_name,
-                    "artist": music.artist.artist_name if music.artist else "Unknown",
-                    "album_image": music.album.album_image if music.album else "",
-                    "likes": 0  # 큐레이션이므로 좋아요 수는 표시용으로만 사용하거나 생략 가능 (필요시 조인)
-                })
+                # 2. DB 조회
+                found_songs = Music.objects.filter(
+                    q_objects,
+                    is_deleted=False
+                ).select_related('artist', 'album')
+
+                # 3. 데이터 변환
+                tracks = []
+                for music in found_songs:
+                    tracks.append({
+                        "music_id": music.music_id,
+                        "music_name": music.music_name,
+                        "artist": music.artist.artist_name if music.artist else "Unknown",
+                        "album_image": music.album.album_image if music.album else "",
+                    })
+                
+                # 4. 셔플
+                random.shuffle(tracks)
+                
+                # 5. 결과 추가
+                if tracks:
+                    theme_station_list.append({
+                        "category": category,
+                        "keyword": category, 
+                        "tracks": tracks
+                    })
             
-            # 4. 셔플 (장르 섞기)
-            random.shuffle(tracks)
-            
-            # 5. 결과 추가 (곡이 하나라도 있는 경우만)
-            if tracks:
-                # 키워드는 카테고리 이름의 첫 단어 등을 사용하거나 별도 매핑 필요
-                # 여기서는 카테고리 이름 그대로 사용
-                station_data.append({
-                    "category": category,
-                    "keyword": category, 
-                    "tracks": tracks
+            if theme_station_list:
+                result.append({
+                    "theme": theme_titles.get(theme_key, theme_key),
+                    "station_data": theme_station_list
                 })
         
-        return station_data
+        return result
