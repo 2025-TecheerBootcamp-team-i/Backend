@@ -340,16 +340,18 @@ class OpenSearchSyncView(APIView):
         from ..models import Music
         
         try:
-            # DB에서 모든 음악 조회
-            musics = Music.objects.select_related(
+            # DB에서 삭제되지 않은 음악만 조회
+            musics = Music.objects.filter(
+                is_deleted=False
+            ).select_related(
                 'artist', 'album'
             ).prefetch_related('musictags_set__tag')
-            
+
             music_list = []
             for music in musics:
                 # 태그 추출
                 tags = [mt.tag.tag_key for mt in music.musictags_set.all() if mt.tag]
-                
+
                 music_data = {
                     'music_id': music.music_id,
                     'itunes_id': music.itunes_id,
