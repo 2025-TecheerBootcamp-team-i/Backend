@@ -2,7 +2,8 @@
 DJ 스테이션용 선별된 노래 데이터
 """
 
-STATION_CURATION = {
+# 1. 느낌 별 스테이션 (기존 데이터)
+MOOD_STATIONS = {
     "신나는 노래": [
         # 한국 가요
         {"title": "파이팅 해야지", "artist": "부석순"},
@@ -196,3 +197,119 @@ STATION_CURATION = {
         {"title": "Lost Stars", "artist": "Adam Levine"},
     ],
 }
+
+# 2. 장르 별 스테이션 (신규 데이터)
+GENRE_STATIONS = {
+    "요즘 K-POP": [
+        {"title": "Whiplash", "artist": "aespa"},
+        {"title": "Love, Money, Fame", "artist": "세븐틴"},
+        {"title": "Cherish", "artist": "ILLIT"},
+        {"title": "Gold", "artist": "ITZY"},
+        {"title": "Mantra", "artist": "제니"},
+        {"title": "Moonlit Floor", "artist": "리사"},
+        {"title": "UP", "artist": "카리나"},
+        {"title": "Power", "artist": "지드래곤"},
+        {"title": "APT.", "artist": "로제"},
+        {"title": "Steady", "artist": "NCT WISH"},
+        {"title": "SOS", "artist": "피프티 피프티"},
+        {"title": "Pleasure", "artist": "강다니엘"},
+    ],
+    "요즘 POP": [
+        {"title": "Die With A Smile", "artist": "Lady Gaga"},
+        {"title": "Birds of a Feather", "artist": "Billie Eilish"},
+        {"title": "Espresso", "artist": "Sabrina Carpenter"},
+        {"title": "Taste", "artist": "Sabrina Carpenter"},
+        {"title": "Good Luck, Babe!", "artist": "Chappell Roan"},
+        {"title": "Dancing in the Flames", "artist": "The Weeknd"},
+        {"title": "Disease", "artist": "Lady Gaga"},
+        {"title": "Stargazing", "artist": "Myles Smith"},
+    ],
+    "슬픈 발라드": [
+        {"title": "헤어지자 말해요", "artist": "박재정"},
+        {"title": "인사", "artist": "범진"},
+        {"title": "너의 모든 순간", "artist": "성시경"},
+        {"title": "온기", "artist": "임영웅"},
+        {"title": "첫 눈", "artist": "EXO"},
+        {"title": "일기", "artist": "김나영"},
+        {"title": "너를 만나", "artist": "폴킴"},
+        {"title": "어떻게 이별까지 사랑하겠어", "artist": "AKMU"},
+        {"title": "사막에서 꽃을 피우듯", "artist": "우디"},
+        {"title": "모래 알갱이", "artist": "임영웅"},
+        {"title": "만남은 쉽고 이별은 어려워", "artist": "베이식"},
+        {"title": "그리워하다", "artist": "비투비"},
+    ],
+    "편안한 알앤비": [
+        {"title": "instagram", "artist": "DEAN"},
+        {"title": "Bye bye my blue", "artist": "백예린"},
+        {"title": "어색하게", "artist": "박재범"},
+        {"title": "가끔", "artist": "크러쉬"},
+        {"title": "주마등", "artist": "빈지노"},
+        {"title": "비", "artist": "폴킴"},
+        {"title": "Blue", "artist": "태형"},
+        {"title": "오랜만이야", "artist": "로꼬"},
+        {"title": "우주를 건너", "artist": "백예린"},
+        {"title": "D (Half Moon)", "artist": "DEAN"},
+        {"title": "잊어버리지마", "artist": "크러쉬"},
+        {"title": "Hype Boy (R&B Ver.)", "artist": "뉴진스"},
+    ],
+    "요즘 국힙": [
+        {"title": "Small girl", "artist": "이영지"},
+        {"title": "미안해", "artist": "양홍원"},
+        {"title": "응", "artist": "그루비룸"},
+        {"title": "Burn It", "artist": "블라세"},
+        {"title": "가시", "artist": "창모"},
+        {"title": "DNA", "artist": "박재범"},
+        {"title": "빙글빙글", "artist": "헤이즈"},
+        {"title": "Break", "artist": "빈지노"},
+        {"title": "Counting Stars", "artist": "비오"},
+        {"title": "고독하구만", "artist": "머쉬베놈"},
+        {"title": "눈", "artist": "자이언티"},
+        {"title": "호우주의보", "artist": "창모"},
+    ],
+    "요즘 외힙": [
+        {"title": "Not Like Us", "artist": "Kendrick Lamar"},
+        {"title": "Timeless", "artist": "The Weeknd"},
+        {"title": "Like That", "artist": "Future"},
+        {"title": "Million Dollar Baby", "artist": "Tommy Richman"},
+        {"title": "Carnival", "artist": "Kanye West"},
+        {"title": "Type Shit", "artist": "Future"},
+        {"title": "FE!N", "artist": "Travis Scott"},
+        {"title": "Rockstar", "artist": "Post Malone"},
+    ],
+    "잔잔한 클래식": [
+        {"title": "River Flows In You", "artist": "이루마"},
+        {"title": "Gymnopédie No. 1", "artist": "Erik Satie"},
+        {"title": "Clair de Lune", "artist": "Debussy"},
+        {"title": "Nocturne Op. 9 No. 2", "artist": "Chopin"},
+        {"title": "Canon in D", "artist": "Pachelbel"},
+        {"title": "The Swan", "artist": "Saint-Saëns"},
+        {"title": "Air on the G String", "artist": "Bach"},
+        {"title": "Liebestraum No. 3", "artist": "Liszt"},
+        {"title": "Pavane", "artist": "Fauré"},
+        {"title": "Merry-Go-Round of Life", "artist": "Joe Hisaishi"},
+        {"title": "Summer", "artist": "Joe Hisaishi"},
+        {"title": "Serenade", "artist": "Schubert"},
+    ],
+    "EDM": [
+        {"title": "The Spectre", "artist": "Alan Walker"},
+        {"title": "Wake Me Up", "artist": "Avicii"},
+        {"title": "Stay", "artist": "Zedd"},
+        {"title": "Clarity", "artist": "Zedd"},
+        {"title": "Heroes", "artist": "Alesso"},
+        {"title": "Don't Let Me Down", "artist": "The Chainsmokers"},
+        {"title": "Animals", "artist": "Martin Garrix"},
+        {"title": "Titanium", "artist": "David Guetta"},
+        {"title": "Levels", "artist": "Avicii"},
+        {"title": "Starboy", "artist": "The Weeknd"},
+        {"title": "Lean On", "artist": "Major Lazer"},
+    ],
+}
+
+# 3. 통합 데이터 (구조화)
+STATION_DATA = {
+    "mood": MOOD_STATIONS,
+    "genre": GENRE_STATIONS
+}
+
+# 하위 호환성을 위해 기존 이름도 남겨둠 (필요시 사용)
+# STATION_CURATION = {**MOOD_STATIONS, **GENRE_STATIONS} 
