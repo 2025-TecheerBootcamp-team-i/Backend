@@ -42,3 +42,6 @@ static_root/
 # =============================================
 *.log
 .env.production
+
+#
+.antigravityrules
