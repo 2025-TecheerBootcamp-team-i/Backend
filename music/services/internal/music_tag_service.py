@@ -38,7 +38,7 @@ class MusicTagService:
         music_tags = MusicTags.objects.filter(
             music_id=music_id,
             tag__is_deleted=False
-        ).select_related('tag').order_by('-score')[:30]
+        ).select_related('tag').order_by('-score')[:25]
         
         if not music_tags.exists():
             return []
@@ -53,7 +53,7 @@ class MusicTagService:
             percentage = round((score / total_score * 100), 1) if total_score > 0 else 0.0
             
             # 시각적 구분을 위해 score를 세제곱하여 weight 계산 (값이 클수록 더 넓은 영역 차지)
-            weight = score ** 2.5
+            weight = score ** 2
             
             children.append({
                 "tag": mt.tag, # Serializer에서 tag.tag_key를 꺼내도록 mt.tag 객체 전달
