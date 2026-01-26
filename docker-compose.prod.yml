@@ -28,7 +28,7 @@ services:
 
       # ===== CORS 미들웨어 추가 =====
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=http://localhost:4173,http://localhost:5173,https://your-frontend-domain.com"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=http://localhost:4173,http://localhost:5173,http://localhost:3000,https://frontend-eosin-seven-18.vercel.app"
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowcredentials=true"
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowheaders=Content-Type,Authorization,Accept,Accept-Encoding,X-Requested-With"
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=86400"
