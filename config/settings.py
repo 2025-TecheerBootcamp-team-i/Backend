@@ -265,7 +265,7 @@ if DEBUG:
 else:
     # 프로덕션 환경: 허용할 도메인을 명시적으로 지정 (화이트리스트 방식)
     CORS_ALLOWED_ORIGINS = [
-        'https://your-frontend-domain.vercel.app',  # Vercel 배포 도메인 (실제 도메인으로 변경 필요)
+        'https://frontend-eosin-seven-18.vercel.app/',  # Vercel 배포 도메인 (실제 도메인으로 변경 필요)
         'http://localhost:3000',  # React 개발 서버 (로컬 테스트용)
         'http://localhost:5173',  # Vite 개발 서버 (로컬 테스트용)
         'http://localhost:4173', 
