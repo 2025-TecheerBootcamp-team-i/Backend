@@ -21,3 +21,24 @@ scrape_configs:
       - targets: ['backend:8000']
         labels:
           service: 'django'
+
+  # cAdvisor - 컨테이너 메트릭
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+
+  # Node Exporter - 호스트 시스템 메트릭
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+
+  # Celery Exporter - Celery 워커 메트릭
+  - job_name: 'celery-exporter'
+    static_configs:
+      - targets: ['celery-exporter:9808']
+        labels:
+          service: 'celery-exporter'
