@@ -176,27 +176,21 @@ services:
 
   # 9. cAdvisor (컨테이너 메트릭 수집)
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
     privileged: true
-    devices:
-      - /dev/kmsg
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
     ports:
       - "8080:8080"
     networks:
       - ubuntu_gitops-network
     restart: unless-stopped
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 200M
 
   # 10. Node Exporter (호스트 시스템 메트릭)
   node-exporter:
