@@ -269,6 +269,7 @@ else:
         'http://localhost:3000',  # React 개발 서버 (로컬 테스트용)
         'http://localhost:5173',  # Vite 개발 서버 (로컬 테스트용)
         'http://localhost:4173', 
+        'https://www.brokencarrot.my', # New Domain
     ]
 
 # CORS 쿠키 및 인증 정보 전송 허용

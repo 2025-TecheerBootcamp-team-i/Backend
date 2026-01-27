@@ -35,3 +35,10 @@ scrape_configs:
       - targets: ['node-exporter:9100']
         labels:
           service: 'node-exporter'
+
+  # Celery Exporter - Celery 워커 메트릭
+  - job_name: 'celery-exporter'
+    static_configs:
+      - targets: ['celery-exporter:9808']
+        labels:
+          service: 'celery-exporter'
