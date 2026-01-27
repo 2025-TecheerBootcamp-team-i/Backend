@@ -198,7 +198,51 @@ services:
         limits:
           memory: 200M
 
-  # 10. Grafana Agent (메트릭 전송 - 완벽 설정)
+  # 10. Node Exporter (호스트 시스템 메트릭)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # 11. Celery Exporter (Celery 메트릭)
+  celery-exporter:
+    image: danihodovic/celery-exporter:latest
+    container_name: celery-exporter
+    environment:
+      - CE_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+    ports:
+      - "9808:9808"
+    depends_on:
+      - rabbitmq
+      - celery
+    networks:
+      - ubuntu_gitops-network
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # 12. Grafana Agent (메트릭 전송 - 완벽 설정)
   grafana-agent:
     image: grafana/agent:latest
     container_name: grafana-agent
